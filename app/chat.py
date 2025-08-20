@@ -3,6 +3,7 @@ import random
 import json
 from dotenv import load_dotenv
 from openai import OpenAI
+from fastapi.responses import JSONResponse
 
 # Load .env
 load_dotenv()
@@ -86,8 +87,11 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                 )
                 final_msg = followup.choices[0].message.content
                 messages.append({"role": "assistant", "content": final_msg})
-                return final_msg
+                return JSONResponse(status_code=200,content={"message": final_msg, "session_id": session_id})
     else:
         ai_response = msg.content
         messages.append({"role": "assistant", "content": ai_response})
-        return ai_response
+        return JSONResponse(status_code=200,content={"message": ai_response, "session_id": session_id})
+
+
+print(chat_session("HEHEEHEHE", "hey, what's up?"))
