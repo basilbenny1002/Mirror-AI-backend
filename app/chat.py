@@ -50,7 +50,7 @@ def create_embeddings(file_path: str):
     embeddings = []
     for t in texts:
         resp = client.embeddings.create(
-            model="text-embedding-3-small",
+            model="text-embedding-3-large",
             input=t
         )
         embeddings.append(resp.data[0].embedding) 

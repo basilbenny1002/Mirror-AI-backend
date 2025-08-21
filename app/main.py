@@ -3,9 +3,17 @@ from fastapi.responses import JSONResponse
 from app.chat import chat_session
 from typing import Optional
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  #["http://localhost:3000", "https://www.leadifysolutions.xyz", "http://www.leadifysolutions.xyz"] or ["*"] for all, but not safe for prod
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 class ChatRequest(BaseModel):
     message: str    
     sessionID: str
