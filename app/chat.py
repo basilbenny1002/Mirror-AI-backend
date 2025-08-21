@@ -4,6 +4,15 @@ import json
 from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi.responses import JSONResponse
+import os
+import random
+import json
+import numpy as np
+import faiss
+from dotenv import load_dotenv
+from openai import OpenAI
+from PyPDF2 import PdfReader
+from fastapi.responses import JSONResponse
 
 # Load .env
 load_dotenv()
@@ -11,6 +20,50 @@ api_key = os.getenv("OPEN_AI_API_KEY")
 
 client = OpenAI(api_key=api_key)
 
+
+
+def extract_text_from_pdf(pdf_path):
+    reader = PdfReader(pdf_path)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() + "\n"
+    return text
+
+def chunk_text(text, chunk_size=500):
+    words = text.split()
+    chunks, current = [], []
+    for word in words:
+        current.append(word)
+        if len(current) >= chunk_size:
+            chunks.append(" ".join(current))
+            current = []
+    if current:
+        chunks.append(" ".join(current))
+    return chunks
+
+def build_faiss_index(pdf_path):
+    text = extract_text_from_pdf(pdf_path)
+    chunks = chunk_text(text)
+
+    embeddings = [
+        client.embeddings.create(model="text-embedding-3-small", input=chunk).data[0].embedding
+        for chunk in chunks
+    ]
+
+    dim = len(embeddings[0])
+    index = faiss.IndexFlatL2(dim)
+    index.add(np.array(embeddings).astype("float32"))
+
+    return index, chunks
+
+def search_docs(query, index, chunks, top_k=3):
+    q_emb = client.embeddings.create(model="text-embedding-3-small", input=query).data[0].embedding
+    D, I = index.search(np.array([q_emb]).astype("float32"), top_k)
+    return [chunks[i] for i in I[0]]
+
+def company_docs(query: str):
+    results = search_docs(query, doc_index, doc_chunks)
+    return "\n".join(results)
 
 # Fake weather tool
 def get_weather(city: str):
@@ -65,6 +118,20 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                         "required": ["city"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "company_docs",
+                    "description": "Search company PDF knowledge base",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string"}
+                        },
+                        "required": ["query"]
+                    }
+                }
             }
         ]
     )
@@ -93,5 +160,8 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         messages.append({"role": "assistant", "content": ai_response})
         return JSONResponse(status_code=200,content={"message": ai_response, "session_id": session_id})
 
+
+pdf_path = "company_info.pdf"   
+doc_index, doc_chunks = build_faiss_index(pdf_path)
 
 print(chat_session("HEHEEHEHE", "hey, what's up?"))
