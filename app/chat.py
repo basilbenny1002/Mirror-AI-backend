@@ -19,6 +19,7 @@ import io
 import nltk
 import chromadb
 from database.database_functions import create_embeddings, query_company_details
+from website_parser import query_website_data
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 load_dotenv()
@@ -85,29 +86,49 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                     }
                 }
             },{
-    "type": "function",
-    "function": {
-        "name": "query_company_details",
-        "description": "Retrieve relevant details about a company from indexed documents. Useful for answering questions about a company's services, projects, or background.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "The natural language question about the company. Example: 'name of the company', 'founded year', 'list of services', etc."
-                },
-                "top_k": {
-                    "type": "integer",
-                    "description": "Number of most relevant chunks to retrieve.",
-                    "default": 5
+                "type": "function",
+                "function": {
+                    "name": "query_company_details",
+                    "description": "Retrieve relevant details about a company from indexed documents. Useful for answering questions about a company's services, projects, or background.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "The natural language question about the company. Example: 'name of the company', 'founded year', 'list of services', etc."
+                            },
+                            "top_k": {
+                                "type": "integer",
+                                "description": "Number of most relevant chunks to retrieve.",
+                                "default": 5
+                            }
+                        },
+                        "required": ["query"]
+                    }
                 }
             },
-            "required": ["query"]
-        }
-    }
-}
-
-            
+        {
+            "type": "function",
+            "function": {
+                "name": "query_website_data",
+                "description": "Search the company's website data to answer user questions about the site (services, policies, terms, contact info, etc.).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "The user question reformulated as a keyword search (e.g., 'terms and conditions', 'privacy policy', 'services offered')."
+                        },
+                        "top_k": {
+                            "type": "integer",
+                            "description": "The maximum number of relevant text snippets to retrieve.",
+                            "default": 5
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        }, 
         ]
     )
 
