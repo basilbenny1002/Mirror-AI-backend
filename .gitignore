@@ -3,3 +3,5 @@ __pycache__/main.cpython-312.pyc
 app/__pycache__
 output.txt
 chroma_store
+database/__pycache__/database_functions.cpython-312.pyc
+scraped_data
