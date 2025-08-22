@@ -27,6 +27,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 # Load .env
 load_dotenv()
 api_key = os.getenv("OPEN_AI_API_KEY")
+system_prompt = os.getenv("SYSTEM_PROMPT", "You are a helpful assistant.")
 
 client = OpenAI(api_key=api_key)
 chroma_client = chromadb.PersistentClient(path="chroma_store")  # stores DB in folder
@@ -50,7 +51,7 @@ def create_embeddings(file_path: str):
     embeddings = []
     for t in texts:
         resp = client.embeddings.create(
-            model="text-embedding-3-large",
+            model="text-embedding-3-small",
             input=t
         )
         embeddings.append(resp.data[0].embedding) 
@@ -63,7 +64,7 @@ def create_embeddings(file_path: str):
 
 def query_company_details(query: str, top_k: int = 5):
     query_embedding = client.embeddings.create(
-    model="text-embedding-3-large",
+    model="text-embedding-3-small",
     input=query
     ).data[0].embedding
 
@@ -102,7 +103,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     # Create new session if not exist
     if session_id not in chats:
         chats[session_id] = [
-            {"role": "system", "content": "You are a helpful assistant. If you need weather info, call the tool 'get_weather'."}
+            {"role": "system", "content": system_prompt}
         ]
 
     messages = chats[session_id]
@@ -200,7 +201,8 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         return JSONResponse(status_code=200,content={"message": ai_response, "session_id": session_id})
 
 
-pdf_path = "company_info.pdf"   
-create_embeddings(pdf_path)
-print("Embeddings created and stored in the vector database.")
-# print(query_company_details("name of the company"))
+# pdf_path = "company_info.pdf"   
+# create_embeddings(pdf_path)
+# print("Embeddings created and stored in the vector database.")
+# query_company_details("company name")
+
