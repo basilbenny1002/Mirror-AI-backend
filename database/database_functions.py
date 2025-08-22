@@ -65,7 +65,7 @@ def query_company_details(query: str, top_k: int = 5):
 
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=3
+        n_results=top_k
     )
     print(results, flush=True)
     return f'The relevant data are:{results["documents"][0] if results["documents"] else "No relevant information found."}'
