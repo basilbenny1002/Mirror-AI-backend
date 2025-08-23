@@ -236,6 +236,7 @@ except Exception as e:
     raise Exception(f"Failed to process PDF: {str(e)}")
 
 # System instructions
+instructions = f"""You are a helpful assistant. Use the following information from the PDF to answer user questions. info {pdf_text}"""
 
 
 # Define the get_weather tool
