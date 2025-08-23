@@ -25,9 +25,11 @@ api_key = os.getenv("OPEN_AI_API_KEY")
 system_prompt = os.getenv("SYSTEM_PROMPT", "You are a helpful assistant.")
 
 client = OpenAI(api_key=api_key)
-chroma_client = chromadb.PersistentClient(path="chroma_store")  # stores DB in folder
-collection = chroma_client.get_or_create_collection("CompanyData")
+# chroma_client = chromadb.PersistentClient(path="chroma_store")  # stores DB in folder
+# collection = chroma_client.get_or_create_collection("CompanyData")
 
+chroma_client = chromadb.PersistentClient(path="test_store")  # stores DB in folder
+collection = chroma_client.get_or_create_collection("LeadifyData")
 
 
 def create_embeddings(file_path: str):
@@ -57,15 +59,31 @@ def create_embeddings(file_path: str):
             embeddings=[vec]
         )
 
-def query_company_details(query: str, top_k: int = 5):
+
+def query_website_data(query: str, top_k: int = 3):
     query_embedding = client.embeddings.create(
-    model="text-embedding-3-small",
-    input=query
+        model="text-embedding-3-small",
+        input=query
     ).data[0].embedding
 
     results = collection.query(
         query_embeddings=[query_embedding],
         n_results=top_k
     )
-    print(results, flush=True)
-    return f'The relevant data are:{results["documents"][0] if results["documents"] else "No relevant information found."}'
+    matches = results["documents"]
+    print(f"Query: {query}", flush=True)
+
+    return str(matches) if matches else ["No relevant information found."]
+
+# def query_company_details(query: str, top_k: int = 5):
+#     query_embedding = client.embeddings.create(
+#     model="text-embedding-3-small",
+#     input=query
+#     ).data[0].embedding
+
+#     results = collection.query(
+#         query_embeddings=[query_embedding],
+#         n_results=top_k
+#     )
+#     print(results, flush=True)
+#     return f'The relevant data are:{results["documents"][0] if results["documents"] else "No relevant information found."}'

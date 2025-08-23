@@ -94,30 +94,31 @@ def parse_scraped_data():
     for file_name in os.listdir("scraped_data"):
         with open(os.path.join("scraped_data", file_name), "r", encoding="utf-8") as f:
             data = json.load(f)
-            print(f"URL: {data['url']}")
-            print(f"Title: {data['title']}")
-            print(f"Content Snippet: {data['content'][:200]}...\n")
             summaries = summarize_data(data['content'])
             data = {"website": data['url'], "title": data['title'], "summaries": summaries}
             texts.append(data)
 
     embeddings = []
+    limit = 0
     for page in texts:
+        limit += 1
+        if limit > 1:  
+            break
         for t in page['summaries']:
             resp = client.embeddings.create(
                 model="text-embedding-3-small",
                 input=t
             )
             embeddings.append(resp.data[0].embedding) 
-        for i, vec in enumerate(embeddings):
+        for i, (summary, vec) in enumerate(zip(page['summaries'], embeddings)):
             collection.add(
-                ids=[str(i)],             # <-- unique ID for each vector
-                documents=[texts[i]], 
+                ids=[f"{page.get('url', '')}_{i}"],
+                documents=[summary],
                 embeddings=[vec],
                 metadatas=[{
-                "url": page["url"],
-                "title": page["title"]
-            }]
+                    "url": page.get("url", ""),
+                    "title": page.get("title", "")
+                }]
             )
         embeddings = []  
 
@@ -140,3 +141,84 @@ def query_website_data(query: str, top_k: int = 5):
     else:
         return "No relevant information found."
 
+# # parse_scraped_data()
+# crawl_js("https://www.hubspot.com/", max_pages=6541)
+# # print(query_website_data("pricing", top_k=3))
+
+# from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+# from reportlab.lib.styles import getSampleStyleSheet
+# from reportlab.lib.pagesizes import A4
+
+# # Text content from all the pages (from previous responses)
+# homepage_text = """Leadify
+# Home
+# Features
+# Pricing
+# Contact
+# Privacy Policy
+# Refund Policy
+# Sign In
+# Sign Up
+# Launching Soon: YouTube Scraper
+# Find the Perfect Content Creators for Your Brand
+# Leadify helps you discover, connect, and collaborate with content creators across multiple platforms.
+# """
+
+# features_text = """Features
+# Discover Influencers: Access a database of content creators across platforms.
+# Filter & Match: Find influencers based on category, reach, engagement, and more.
+# Collaborate Easily: Connect directly and manage collaborations within the platform.
+# Coming Soon: YouTube Scraper for advanced insights.
+# """
+
+# pricing_text = """Pricing
+# Launching Soon!
+# Our pricing plans will be available once the platform launches. Stay tuned for affordable and scalable options to fit your business needs.
+# """
+
+# privacy_policy_text = """Privacy Policy
+# Effective Date: August 20, 2024
+# Leadify (“we,” “our,” or “us”) values your privacy. This Privacy Policy explains how we collect, use, and protect your information.
+# Information We Collect: Personal details such as name, email, business information.
+# How We Use Information: To provide and improve our services, communicate with you, and ensure platform security.
+# Data Protection: We implement measures to safeguard your data.
+# Sharing Information: We do not sell your personal information. Data may be shared with trusted service providers under confidentiality agreements.
+# Your Rights: You may request access, updates, or deletion of your personal data.
+# Contact: For privacy concerns, please email us at support@leadifysolutions.xyz.
+# """
+
+# refund_policy_text = """Refund Policy
+# Effective Date: August 20, 2024
+# Thank you for choosing Leadify. If you are not satisfied with our service, this Refund Policy outlines your rights.
+# Subscriptions: Subscriptions are generally non-refundable. However, exceptions may apply in cases of technical issues or service disruptions caused by us.
+# Requesting a Refund: Email us at support@leadifysolutions.xyz within 7 days of your purchase to request a refund. Include your payment details and reason for the request.
+# Eligibility: Refunds are evaluated on a case-by-case basis. Approved refunds will be processed within 7–10 business days to the original payment method.
+# """
+
+# contact_text = """Contact Us
+# We’d love to hear from you!
+# Email: support@leadifysolutions.xyz
+# Stay connected for updates about Leadify and upcoming features.
+# """
+
+# # Combine all into one document
+# doc = SimpleDocTemplate("LeadifySolutions_Info_FULL.pdf", pagesize=A4)
+# styles = getSampleStyleSheet()
+# story = []
+
+# sections = [
+#     ("Homepage", homepage_text),
+#     ("Features", features_text),
+#     ("Pricing", pricing_text),
+#     ("Privacy Policy", privacy_policy_text),
+#     ("Refund Policy", refund_policy_text),
+#     ("Contact", contact_text)
+# ]
+
+# for title, content in sections:
+#     story.append(Paragraph(f"<b>{title}</b>", styles['Heading2']))
+#     story.append(Spacer(1, 8))
+#     story.append(Paragraph(content.replace("\n", "<br/>"), styles['Normal']))
+#     story.append(Spacer(1, 16))
+
+# doc.build(story)
