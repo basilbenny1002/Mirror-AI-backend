@@ -1,80 +1,58 @@
 import random
 from database.insights_db import save_insight, search_insight
+import os
+import requests
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+API_KEY = os.getenv("GHL_API_KEY")
+
+if not API_KEY:
+    raise ValueError("GHL_API_KEY not found in .env file")
+
+# Endpoint + headers
+GHL_URL = "https://rest.gohighlevel.com/v1/contacts/"
+HEADERS = {
+    "Authorization": f"Bearer {API_KEY}",
+    "Content-Type": "application/json"
+}
+
+# Replace these with your actual custom field IDs
+BOOKED_FIELD_ID = "abc12345"        # e.g. "Booked Call" field
+CONVERSATION_FIELD_ID = "def67890"  # e.g. "Conversation Notes" field
+
 
 def get_weather(city: str):
+    """Generate random weather conditions for a given city."""
     temp = random.randint(10, 40)
     conditions = random.choice(["sunny", "cloudy", "rainy", "windy"])
     return f"The weather in {city} is {temp}°C and {conditions}."
 
-def save_insight_tool(insight: str):
+def add_contact(name: str, email: str, phone: str, booked: str, conversation: str):
     """
-    Save an insight into the vector database.
+    Add a contact to GoHighLevel with custom fields.
     """
-    save_insight("AI_SESSION", insight)  # session id could be dynamic
-    return f"Insight saved: {insight}"
 
-def search_insight_tool(query: str, n: int = 3):
-    """
-    Search for relevant past insights in the vector database.
-    """
-    results = search_insight(query, n=n)
-    if not results:
-        return "No relevant insights found."
-    return " | ".join(results)
+    # Split name into first/last
+    parts = name.strip().split(" ", 1)
+    first_name = parts[0]
+    last_name = parts[1] if len(parts) > 1 else ""
 
-
-TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_weather",
-            "description": "Get the weather for a given city",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "city": {"type": "string", "description": "City name"}
-                },
-                "required": ["city"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "save_insight_tool",
-            "description": "Save an important insight into the vector database for later recall",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "insight": {
-                        "type": "string",
-                        "description": "The insight text to save into the database"
-                    }
-                },
-                "required": ["insight"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_insight_tool",
-            "description": "Search for relevant past insights from the vector database",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The topic or question to look up"
-                    },
-                    "n": {
-                        "type": "integer",
-                        "description": "Number of top insights to return (default 3)"
-                    }
-                },
-                "required": ["query"]
-            }
+    payload = {
+        "firstName": first_name,
+        "lastName": last_name,
+        "email": email,
+        "phone": phone,
+        "customField": {
+            BOOKED_FIELD_ID: booked,
+            CONVERSATION_FIELD_ID: conversation
         }
     }
-]
 
+    response = requests.post(GHL_URL, headers=HEADERS, json=payload)
+
+    if response.status_code == 200:
+        return {"status": "success", "data": response.json()}
+    else:
+        return {"status": "error", "code": response.status_code, "message": response.text}

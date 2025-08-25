@@ -5,3 +5,5 @@ output.txt
 chroma_store
 database/__pycache__/database_functions.cpython-312.pyc
 scraped_data
+app/utils/__pycache__
+database/__pycache__

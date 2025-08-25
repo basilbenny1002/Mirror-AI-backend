@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi.responses import JSONResponse
 import PyPDF2
+from app.utils.tools import get_weather, add_contact
 
 # Load environment variables
 load_dotenv()
@@ -35,7 +36,15 @@ except Exception as e:
     raise Exception(f"Failed to process PDF: {str(e)}")
 
 # System instructions
-instructions = f"""You are a helpful assistant. Use the following information from the PDF to answer user questions. info {pdf_text}"""
+
+company_name = "Leadify"
+company_specialization = "lead generation"
+company_documentation = pdf_text  # Assuming 'pdf_text' is the variable from your original code containing the extracted PDF text
+additional_info = """
+Leadify specializes in scraping Twitch to identify high-potential leads, such as streamers and content creators, and filtering them based on criteria like viewer count, engagement rates, content categories, or custom brand requirements. This enables brands to efficiently connect with a large number of creators for sponsorships, influencer partnerships, marketing campaigns, or community growth. For example, if a brand needs gaming influencers with 1,000+ average viewers for a campaign, Leadify’s process identifies, filters, and streamlines outreach to maximize ROI. Benefits include time savings, precise targeting, and scalable outreach, allowing brands to build impactful partnerships quickly.
+"""
+
+# The full dynamic system prompt as a multi-line string, formatted with the variables
 
 # Define the get_weather tool
 weather_tool = {
@@ -55,15 +64,45 @@ weather_tool = {
         }
     }
 }
+add_contact_tool = {
+    "type": "function",
+    "function": {
+        "name": "add_contact",
+        "description": "Add a new contact to GoHighLevel CRM with custom fields for booking status and conversation notes.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Full name of the contact (first and last name)."
+                },
+                "email": {
+                    "type": "string",
+                    "description": "Email address of the contact."
+                },
+                "phone": {
+                    "type": "string",
+                    "description": "Phone number of the contact in E.164 format (+countrycodexxxxxxxxxx)."
+                },
+                "booked": {
+                    "type": "string",
+                    "description": "Booking status or details about the booked call/meeting."
+                },
+                "conversation": {
+                    "type": "string",
+                    "description": "Conversation notes or details about prior interactions with the contact."
+                }
+            },
+            "required": ["name", "email", "phone", "booked", "conversation"]
+        }
+    }
+}
+
 
 # Storage for sessions (session_id to conversation history)
 sessions = {}
 
-def get_weather(city: str):
-    """Generate random weather conditions for a given city."""
-    temp = random.randint(10, 40)
-    conditions = random.choice(["sunny", "cloudy", "rainy", "windy"])
-    return f"The weather in {city} is {temp}°C and {conditions}."
+
 
 def chat_session(session_id: str, user_input: str, end: bool = False):
     """Manage a chat session.
@@ -96,7 +135,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=sessions[session_id]["messages"],
-            tools=[weather_tool],
+            tools=[weather_tool, add_contact_tool],
             tool_choice="auto"
         )
     except Exception as e:
@@ -118,7 +157,20 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                         "tool_call_id": tool_call.id
                     })
                 except Exception as e:
-                    return JSONResponse( status_code=500, content={"message":f"Error processing tool call: {str(e)}"})
+                    return JSONResponse(status_code=500, content={"message":f"Error processing tool call: {str(e)}"})
+            elif tool_call.type == "function" and tool_call.function.name == "add_contact":
+                result = add_contact(
+                    name=args["name"],
+                    email=args["email"],
+                    phone=args["phone"],
+                    booked=args["booked"],
+                    conversation=args["conversation"]
+                )
+                tool_messages.append({
+                    "role": "tool",
+                    "content": json.dumps(result),  # always return JSON as string
+                    "tool_call_id": tool_call.id
+                })
 
         # Append assistant message (without tool_calls) to history
         sessions[session_id]["messages"].append({

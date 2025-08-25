@@ -201,11 +201,61 @@ def query_refund_policy(query: str, collection, top_k: int = 3):
 
 
 
-chroma_client = chromadb.PersistentClient(path="test_store")  # stores DB in folder
-collection = chroma_client.get_or_create_collection("LeadifyData")
+# chroma_client = chromadb.PersistentClient(path="test_store")  # stores DB in folder
+# collection = chroma_client.get_or_create_collection("LeadifyData")
 
-store_policy_in_db(refund_policy_text, collection)
+# store_policy_in_db(refund_policy_text, collection)
 
-# 2. Query
-print(query_refund_policy("Can I get a cash refund if I cancel my subscription?", collection))
-print(query_refund_policy("What happens if I report an issue within 30 days?", collection))
+# # 2. Query
+# print(query_refund_policy("Can I get a cash refund if I cancel my subscription?", collection))
+# print(query_refund_policy("What happens if I report an issue within 30 days?", collection))
+
+import os
+import requests
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv()
+API_KEY = os.getenv("GHL_API_KEY")
+
+if not API_KEY:
+    raise ValueError("GHL_API_KEY not found in .env file")
+
+# GHL API endpoint
+url = "https://rest.gohighlevel.com/v1/contacts/"
+
+# Headers with API Key
+headers = {
+    "Authorization": f"Bearer {API_KEY}",
+    "Content-Type": "application/json"
+}
+
+# Sample contact info with custom fields
+"""
+{
+  "firstName": "John",
+  "lastName": "Apple",
+  "email": "john.apple@example.com",
+  "phone": "+15555555555",
+  "customField": {
+      "customFieldIdHere": "Custom field value",
+      "anotherCustomFieldIdHere": "Another value"
+  }
+}
+
+"""
+
+payload = {
+    "firstName": "John",
+    "lastName": "Apple",
+    "email": "john.apple@example.com",
+    "phone": "+15555555555"  # <- Use E.164 format (+countrycode number)
+}
+
+# Send request
+response = requests.post(url, headers=headers, json=payload)
+
+if response.status_code == 200:
+    print(" Contact added successfully:", response.json())
+else:
+    print(" Error:", response.status_code, response.text)
