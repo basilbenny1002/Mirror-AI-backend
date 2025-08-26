@@ -7,7 +7,7 @@ from openai import OpenAI
 from fastapi.responses import JSONResponse
 import PyPDF2
 from app.utils.tools import get_weather, add_contact
-
+from pathlib import Path
 # Load environment variables
 load_dotenv()
 api_key = os.getenv("OPEN_AI_API_KEY")
@@ -110,12 +110,19 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     Args:
         session_id: Unique identifier for the chat
         user_input: User text prompt
-        end: If True, close the chat and return final response
+        end: If True, close the chat, store conversation as text file, and return final response
     """
     if end:
         if session_id in sessions:
+            # Store conversation as plain text
+            file_path = Path(f"{session_id}.txt")
+            with file_path.open("w", encoding="utf-8") as f:
+                for msg in sessions[session_id]["messages"]:
+                    f.write(f"Role: {msg['role']}\n")
+                    f.write(f"Content: {msg['content']}\n")
+                    f.write("---\n")
             del sessions[session_id]
-        return "Chat session ended."
+        return "Chat session ended and saved to file."
 
     if session_id not in sessions:
         sessions[session_id] = {
@@ -159,6 +166,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                 except Exception as e:
                     return JSONResponse(status_code=500, content={"message":f"Error processing tool call: {str(e)}"})
             elif tool_call.type == "function" and tool_call.function.name == "add_contact":
+                args = json.loads(tool_call.function.arguments)
                 result = add_contact(
                     name=args["name"],
                     email=args["email"],
@@ -202,4 +210,119 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     })
 
     return JSONResponse( status_code=200, content={"message":response_message})
+
+
+
+
+def resume_chat_session(session_id: str, user_input: str):
+    """Load a saved chat session from text file, continue with new user input, return bot reply, and save updated conversation.
+    
+    Args:
+        session_id: Unique identifier for the chat (used to find .txt file)
+        user_input: New user text prompt
+    """
+    file_path = Path(f"{session_id}.txt")
+    if not file_path.exists():
+        return f"No saved session found for {session_id}."
+
+    # Load messages from file
+    messages = []
+    with file_path.open("r", encoding="utf-8") as f:
+        content = f.read()
+        blocks = content.split("---\n")
+        for block in blocks:
+            if not block.strip():
+                continue
+            lines = block.split("\n")
+            role = lines[0].replace("Role: ", "").strip()
+            content_start = lines[1].replace("Content: ", "").strip()
+            # Handle multi-line content if any (though in this format, content is single line; adjust if needed)
+            messages.append({"role": role, "content": content_start})
+
+    # Add new user message
+    messages.append({
+        "role": "user",
+        "content": user_input
+    })
+
+    # Prepare the API request (similar to original)
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            tools=[weather_tool, add_contact_tool],
+            tool_choice="auto"
+        )
+    except Exception as e:
+        return f"Error calling chat completion: {str(e)}"
+
+    # Process the response (similar to original)
+    choice = response.choices[0]
+    if choice.finish_reason == "tool_calls":
+        tool_calls = choice.message.tool_calls
+        tool_messages = []
+        for tool_call in tool_calls:
+            if tool_call.type == "function" and tool_call.function.name == "get_weather":
+                try:
+                    args = json.loads(tool_call.function.arguments)
+                    result = get_weather(args["city"])
+                    tool_messages.append({
+                        "role": "tool",
+                        "content": result,
+                        "tool_call_id": tool_call.id
+                    })
+                except Exception as e:
+                    return f"Error processing tool call: {str(e)}"
+            elif tool_call.type == "function" and tool_call.function.name == "add_contact":
+                args = json.loads(tool_call.function.arguments)
+                result = add_contact(
+                    name=args["name"],
+                    email=args["email"],
+                    phone=args["phone"],
+                    booked=args["booked"],
+                    conversation=args["conversation"]
+                )
+                tool_messages.append({
+                    "role": "tool",
+                    "content": json.dumps(result),  # always return JSON as string
+                    "tool_call_id": tool_call.id
+                })
+
+        # Append assistant message (without tool_calls) to history
+        messages.append({
+            "role": "assistant",
+            "content": choice.message.content or ""
+        })
+
+        # Append tool response messages to history
+        messages.extend(tool_messages)
+
+        # Submit tool outputs and get final response
+        try:
+            final_response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                tools=[weather_tool],
+                tool_choice="auto"
+            )
+            response_message = final_response.choices[0].message.content
+        except Exception as e:
+            return f"Error submitting tool outputs: {str(e)}"
+    else:
+        response_message = choice.message.content
+
+    # Append final assistant response to history
+    messages.append({
+        "role": "assistant",
+        "content": response_message
+    })
+
+    # Save updated conversation back to file
+    with file_path.open("w", encoding="utf-8") as f:
+        for msg in messages:
+            f.write(f"Role: {msg['role']}\n")
+            f.write(f"Content: {msg['content']}\n")
+            f.write("---\n")
+
+    return response_message
 

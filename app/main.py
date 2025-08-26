@@ -31,4 +31,5 @@ def chat(data: ChatRequest):
         return chat_session(data.sessionID, data.message, data.end if data.end else None )
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+    
 
