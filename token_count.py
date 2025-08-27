@@ -64,140 +64,140 @@
 
 
 
-from openai import OpenAI
-import textwrap
-import os
-import chromadb
-from dotenv import load_dotenv
-load_dotenv()
-client = OpenAI(api_key=os.getenv("OPEN_AI_API_KEY"))
+# from openai import OpenAI
+# import textwrap
+# import os
+# import chromadb
+# from dotenv import load_dotenv
+# load_dotenv()
+# client = OpenAI(api_key=os.getenv("OPEN_AI_API_KEY"))
 
-# -----------------------------
-# 1. Prepare Refund Policy Text
-# -----------------------------
-refund_policy_text = """
-Leadify Solutions — Home Page
+# # -----------------------------
+# # 1. Prepare Refund Policy Text
+# # -----------------------------
+# refund_policy_text = """
+# Leadify Solutions — Home Page
 
-Launching Soon: YouTube Scraper
+# Launching Soon: YouTube Scraper
 
-Find the Perfect Content Creators for Your Brand
+# Find the Perfect Content Creators for Your Brand
 
-Leadify helps you discover, connect with, and manage relationships with the right content creators to amplify your brand's message.
+# Leadify helps you discover, connect with, and manage relationships with the right content creators to amplify your brand's message.
 
-Get Started Free — No credit card required
+# Get Started Free — No credit card required
 
-See How It Works
+# See How It Works
 
-Free plan available
+# Free plan available
 
-Trusted by marketing teams at:
-ThreeCloverMedia, Organix, Nexus Ai, Fulfilledge
+# Trusted by marketing teams at:
+# ThreeCloverMedia, Organix, Nexus Ai, Fulfilledge
 
-Why Choose Leadify?
+# Why Choose Leadify?
 
-Data-Driven Decisions
-Make informed choices using comprehensive analytics and insights, including engagement rates, audience demographics, and performance trends.
+# Data-Driven Decisions
+# Make informed choices using comprehensive analytics and insights, including engagement rates, audience demographics, and performance trends.
 
-Time-Saving Automation
-Automate repetitive tasks—data collection, filtering, outreach—so you can focus on building meaningful creator relationships.
+# Time-Saving Automation
+# Automate repetitive tasks—data collection, filtering, outreach—so you can focus on building meaningful creator relationships.
 
-Global Reach
-Connect with content creators worldwide; discover creators in multiple languages and regions to expand your brand’s global presence.
+# Global Reach
+# Connect with content creators worldwide; discover creators in multiple languages and regions to expand your brand’s global presence.
 
-Team Collaboration
-Share saved searches, notes, and outreach history with your team to stay aligned and work efficiently.
+# Team Collaboration
+# Share saved searches, notes, and outreach history with your team to stay aligned and work efficiently.
 
-Compliance & Privacy
-Designed with privacy in mind; ensures that all data collection and processing complies with relevant regulations.
+# Compliance & Privacy
+# Designed with privacy in mind; ensures that all data collection and processing complies with relevant regulations.
 
-Seamless Integrations
-Integrate with popular CRM systems, email marketing platforms, and spreadsheet applications to fit into your existing workflow.
+# Seamless Integrations
+# Integrate with popular CRM systems, email marketing platforms, and spreadsheet applications to fit into your existing workflow.
 
-Powerful Tools for Influencer Discovery
+# Powerful Tools for Influencer Discovery
 
-Advanced Search & Filtering
-Find creators by language, follower/viewer count, content type, and more.
+# Advanced Search & Filtering
+# Find creators by language, follower/viewer count, content type, and more.
 
-Comprehensive Analytics
-Access detailed metrics and insights to support data-driven decisions.
+# Comprehensive Analytics
+# Access detailed metrics and insights to support data-driven decisions.
 
-Contact Information Access
-Retrieve public contact details and social media profiles to streamline outreach.
+# Contact Information Access
+# Retrieve public contact details and social media profiles to streamline outreach.
 
-Data Export & Integration
-Export data in multiple formats for easy integration with your tools and workflows.
+# Data Export & Integration
+# Export data in multiple formats for easy integration with your tools and workflows.
 
-Twitch Scraper — (mention suggests specialized Twitch data scraping functionality)
+# Twitch Scraper — (mention suggests specialized Twitch data scraping functionality)
 
-What Our Customers Say
+# What Our Customers Say
 
-JD, Marketing Director, TechCorp
+# JD, Marketing Director, TechCorp
 
-"Leadify has transformed our influencer marketing strategy. We've been able to find creators who truly align with our brand values, resulting in more authentic partnerships and higher ROI."
+# "Leadify has transformed our influencer marketing strategy. We've been able to find creators who truly align with our brand values, resulting in more authentic partnerships and higher ROI."
 
-MS, Growth Lead, StartupX
+# MS, Growth Lead, StartupX
 
-"The time we save using Leadify is incredible. What used to take days of manual research now takes minutes. The advanced filtering options help us pinpoint exactly the type of creators we need."
+# "The time we save using Leadify is incredible. What used to take days of manual research now takes minutes. The advanced filtering options help us pinpoint exactly the type of creators we need."
 
-Call to Action
+# Call to Action
 
-Ready to Transform Your Influencer Marketing?
-Choose the plan that works best for your business needs. All plans include access to our core features.
+# Ready to Transform Your Influencer Marketing?
+# Choose the plan that works best for your business needs. All plans include access to our core features.
 
-Get Started Free
+# Get Started Free
 
-View Pricing
+# View Pricing
 
-14-day free trial — No credit card required
+# 14-day free trial — No credit card required
 
-Cancel anytime
+# Cancel anytime
 
-Footer
+# Footer
 
-Navigation Links: Home | Features | Pricing | Contact | Privacy Policy | Refund Policy
+# Navigation Links: Home | Features | Pricing | Contact | Privacy Policy | Refund Policy
 
-© 2025 Leadify, Inc. All rights reserved.
+# © 2025 Leadify, Inc. All rights reserved.
 
-"""
+# """
 
-# -----------------------------
-# 2. Function to Store in DB
-# -----------------------------
-def store_policy_in_db(text: str, collection):
-    # break text into chunks (per paragraph/line)
-    chunks = [chunk.strip() for chunk in textwrap.dedent(text).split("\n\n") if chunk.strip()]
+# # -----------------------------
+# # 2. Function to Store in DB
+# # -----------------------------
+# def store_policy_in_db(text: str, collection):
+#     # break text into chunks (per paragraph/line)
+#     chunks = [chunk.strip() for chunk in textwrap.dedent(text).split("\n\n") if chunk.strip()]
 
-    for i, chunk in enumerate(chunks):
-        resp = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=chunk
-        )
-        embedding = resp.data[0].embedding
+#     for i, chunk in enumerate(chunks):
+#         resp = client.embeddings.create(
+#             model="text-embedding-3-small",
+#             input=chunk
+#         )
+#         embedding = resp.data[0].embedding
 
-        collection.add(
-            ids=[f"refund_policy_{i}"],
-            documents=[chunk],
-            embeddings=[embedding]
-        )
-    print(f"Stored {len(chunks)} refund policy chunks into vector DB.")
+#         collection.add(
+#             ids=[f"refund_policy_{i}"],
+#             documents=[chunk],
+#             embeddings=[embedding]
+#         )
+#     print(f"Stored {len(chunks)} refund policy chunks into vector DB.")
 
 
-# -----------------------------
-# 3. Query Function
-# -----------------------------
-def query_refund_policy(query: str, collection, top_k: int = 3):
-    query_embedding = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=query
-    ).data[0].embedding
+# # -----------------------------
+# # 3. Query Function
+# # -----------------------------
+# def query_refund_policy(query: str, collection, top_k: int = 3):
+#     query_embedding = client.embeddings.create(
+#         model="text-embedding-3-small",
+#         input=query
+#     ).data[0].embedding
 
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=top_k
-    )
-    matches = results["documents"]
+#     results = collection.query(
+#         query_embeddings=[query_embedding],
+#         n_results=top_k
+#     )
+#     matches = results["documents"]
 
-    return matches if matches else ["No relevant information found."]
+#     return matches if matches else ["No relevant information found."]
 
 
 
@@ -233,10 +233,10 @@ headers = {
 # Sample contact info with custom fields
 """
 {
-  "firstName": "John",
-  "lastName": "Apple",
-  "email": "john.apple@example.com",
-  "phone": "+15555555555",
+  "firstName": "Potato",
+  "lastName": "man",
+  "email": "Potato.man@example.com",
+  "phone": "+5656565656",
   "customField": {
       "customFieldIdHere": "Custom field value",
       "anotherCustomFieldIdHere": "Another value"
@@ -246,10 +246,10 @@ headers = {
 """
 
 payload = {
-    "firstName": "John",
-    "lastName": "Apple",
-    "email": "john.apple@example.com",
-    "phone": "+15555555555"  # <- Use E.164 format (+countrycode number)
+    "firstName": "Potato",
+    "lastName": "man",
+    "email": "Potato.man@example.com",
+    "phone": "+5656565656"  # <- Use E.164 format (+countrycode number)
 }
 
 # Send request

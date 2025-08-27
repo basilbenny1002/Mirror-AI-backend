@@ -110,19 +110,19 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     Args:
         session_id: Unique identifier for the chat
         user_input: User text prompt
-        end: If True, close the chat, store conversation as text file, and return final response
+        end: If True, close the chat, return conversation as string, and clear session
     """
     if end:
         if session_id in sessions:
-            # Store conversation as plain text
-            file_path = Path(f"{session_id}.txt")
-            with file_path.open("w", encoding="utf-8") as f:
-                for msg in sessions[session_id]["messages"]:
-                    f.write(f"Role: {msg['role']}\n")
-                    f.write(f"Content: {msg['content']}\n")
-                    f.write("---\n")
+            # Convert conversation to plain text string
+            conversation = ""
+            for msg in sessions[session_id]["messages"]:
+                conversation += f"Role: {msg['role']}\n"
+                conversation += f"Content: {msg['content']}\n"
+                conversation += "---\n"
             del sessions[session_id]
-        return "Chat session ended and saved to file."
+            return conversation
+        return "Chat session ended, no conversation found."
 
     if session_id not in sessions:
         sessions[session_id] = {
@@ -199,7 +199,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
             )
             response_message = final_response.choices[0].message.content
         except Exception as e:
-            return JSONResponse( status_code=500, content={"message":f"Error submitting tool outputs: {str(e)}"})
+            return JSONResponse(status_code=500, content={"message":f"Error submitting tool outputs: {str(e)}"})
     else:
         response_message = choice.message.content
 
@@ -209,54 +209,54 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         "content": response_message
     })
 
-    return JSONResponse( status_code=200, content={"message":response_message})
+    return JSONResponse(status_code=200, content={"message": response_message})
 
 
 
-
-def resume_chat_session(session_id: str, user_input: str):
-    """Load a saved chat session from text file, continue with new user input, return bot reply, and save updated conversation.
+def resume_chat_session(session_id: str, user_input: str, conversation: str):
+    """Resume a chat session from a conversation string, continue with new user input, and return updated conversation string.
     
     Args:
-        session_id: Unique identifier for the chat (used to find .txt file)
+        session_id: Unique identifier for the chat
         user_input: New user text prompt
+        conversation: String containing the previous conversation
     """
-    file_path = Path(f"{session_id}.txt")
-    if not file_path.exists():
-        return f"No saved session found for {session_id}."
-
-    # Load messages from file
+    # Parse conversation string into messages
     messages = []
-    with file_path.open("r", encoding="utf-8") as f:
-        content = f.read()
-        blocks = content.split("---\n")
+    if conversation:
+        blocks = conversation.split("---\n")
         for block in blocks:
             if not block.strip():
                 continue
             lines = block.split("\n")
             role = lines[0].replace("Role: ", "").strip()
             content_start = lines[1].replace("Content: ", "").strip()
-            # Handle multi-line content if any (though in this format, content is single line; adjust if needed)
             messages.append({"role": role, "content": content_start})
 
+    # If session_id not in sessions, initialize with loaded messages or system message
+    if session_id not in sessions:
+        sessions[session_id] = {
+            "messages": messages if messages else [{"role": "system", "content": instructions}]
+        }
+
     # Add new user message
-    messages.append({
+    sessions[session_id]["messages"].append({
         "role": "user",
         "content": user_input
     })
 
-    # Prepare the API request (similar to original)
+    # Prepare the API request
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=messages,
+            messages=sessions[session_id]["messages"],
             tools=[weather_tool, add_contact_tool],
             tool_choice="auto"
         )
     except Exception as e:
         return f"Error calling chat completion: {str(e)}"
 
-    # Process the response (similar to original)
+    # Process the response
     choice = response.choices[0]
     if choice.finish_reason == "tool_calls":
         tool_calls = choice.message.tool_calls
@@ -284,24 +284,24 @@ def resume_chat_session(session_id: str, user_input: str):
                 )
                 tool_messages.append({
                     "role": "tool",
-                    "content": json.dumps(result),  # always return JSON as string
+                    "content": json.dumps(result),
                     "tool_call_id": tool_call.id
                 })
 
         # Append assistant message (without tool_calls) to history
-        messages.append({
+        sessions[session_id]["messages"].append({
             "role": "assistant",
             "content": choice.message.content or ""
         })
 
         # Append tool response messages to history
-        messages.extend(tool_messages)
+        sessions[session_id]["messages"].extend(tool_messages)
 
         # Submit tool outputs and get final response
         try:
             final_response = client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=messages,
+                messages=sessions[session_id]["messages"],
                 tools=[weather_tool],
                 tool_choice="auto"
             )
@@ -311,18 +311,18 @@ def resume_chat_session(session_id: str, user_input: str):
     else:
         response_message = choice.message.content
 
-    # Append final assistant response to history
-    messages.append({
+    # Append final assistant response to session history
+    sessions[session_id]["messages"].append({
         "role": "assistant",
         "content": response_message
     })
 
-    # Save updated conversation back to file
-    with file_path.open("w", encoding="utf-8") as f:
-        for msg in messages:
-            f.write(f"Role: {msg['role']}\n")
-            f.write(f"Content: {msg['content']}\n")
-            f.write("---\n")
+    # Convert updated conversation to string
+    updated_conversation = ""
+    for msg in sessions[session_id]["messages"]:
+        updated_conversation += f"Role: {msg['role']}\n"
+        updated_conversation += f"Content: {msg['content']}\n"
+        updated_conversation += "---\n"
 
-    return response_message
+    return {"message": response_message, "conversation": updated_conversation}
 
