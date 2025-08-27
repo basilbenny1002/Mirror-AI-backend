@@ -208,21 +208,21 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         "role": "assistant",
         "content": response_message
     })
-
     return JSONResponse(status_code=200, content={"message": response_message})
 
 
-
-def resume_chat_session(session_id: str, user_input: str, conversation: str):
-    """Resume a chat session from a conversation string, continue with new user input, and return updated conversation string.
+def resume_chat_session(session_id: str, user_input: str, conversation: str = ""):
+    """Resume or start a chat session from a conversation string, continue with new user input, and return updated conversation string.
     
     Args:
-        session_id: Unique identifier for the chat
+        session_id: Unique identifier for the chat (not tied to global sessions)
         user_input: New user text prompt
-        conversation: String containing the previous conversation
+        conversation: String containing the previous conversation (optional)
     """
-    # Parse conversation string into messages
+    # Initialize local messages list
     messages = []
+
+    # Parse conversation string into messages if provided
     if conversation:
         blocks = conversation.split("---\n")
         for block in blocks:
@@ -232,15 +232,12 @@ def resume_chat_session(session_id: str, user_input: str, conversation: str):
             role = lines[0].replace("Role: ", "").strip()
             content_start = lines[1].replace("Content: ", "").strip()
             messages.append({"role": role, "content": content_start})
-
-    # If session_id not in sessions, initialize with loaded messages or system message
-    if session_id not in sessions:
-        sessions[session_id] = {
-            "messages": messages if messages else [{"role": "system", "content": instructions}]
-        }
+    else:
+        # Start new session with system instructions
+        messages.append({"role": "system", "content": instructions})
 
     # Add new user message
-    sessions[session_id]["messages"].append({
+    messages.append({
         "role": "user",
         "content": user_input
     })
@@ -249,12 +246,12 @@ def resume_chat_session(session_id: str, user_input: str, conversation: str):
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=sessions[session_id]["messages"],
+            messages=messages,
             tools=[weather_tool, add_contact_tool],
             tool_choice="auto"
         )
     except Exception as e:
-        return f"Error calling chat completion: {str(e)}"
+        return {"message": f"Error calling chat completion: {str(e)}", "conversation": conversation}
 
     # Process the response
     choice = response.choices[0]
@@ -272,7 +269,7 @@ def resume_chat_session(session_id: str, user_input: str, conversation: str):
                         "tool_call_id": tool_call.id
                     })
                 except Exception as e:
-                    return f"Error processing tool call: {str(e)}"
+                    return {"message": f"Error processing tool call: {str(e)}", "conversation": conversation}
             elif tool_call.type == "function" and tool_call.function.name == "add_contact":
                 args = json.loads(tool_call.function.arguments)
                 result = add_contact(
@@ -289,40 +286,39 @@ def resume_chat_session(session_id: str, user_input: str, conversation: str):
                 })
 
         # Append assistant message (without tool_calls) to history
-        sessions[session_id]["messages"].append({
+        messages.append({
             "role": "assistant",
             "content": choice.message.content or ""
         })
 
         # Append tool response messages to history
-        sessions[session_id]["messages"].extend(tool_messages)
+        messages.extend(tool_messages)
 
         # Submit tool outputs and get final response
         try:
             final_response = client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=sessions[session_id]["messages"],
+                messages=messages,
                 tools=[weather_tool],
                 tool_choice="auto"
             )
             response_message = final_response.choices[0].message.content
         except Exception as e:
-            return f"Error submitting tool outputs: {str(e)}"
+            return {"message": f"Error submitting tool outputs: {str(e)}", "conversation": conversation}
     else:
         response_message = choice.message.content
 
     # Append final assistant response to session history
-    sessions[session_id]["messages"].append({
+    messages.append({
         "role": "assistant",
         "content": response_message
     })
 
     # Convert updated conversation to string
     updated_conversation = ""
-    for msg in sessions[session_id]["messages"]:
+    for msg in messages:
         updated_conversation += f"Role: {msg['role']}\n"
         updated_conversation += f"Content: {msg['content']}\n"
         updated_conversation += "---\n"
 
     return {"message": response_message, "conversation": updated_conversation}
-
