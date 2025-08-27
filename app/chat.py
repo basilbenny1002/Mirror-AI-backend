@@ -105,20 +105,40 @@ sessions = {}
 
 
 def chat_session(session_id: str, user_input: str, end: bool = False):
-    """Manage a chat session.
+    """Manage a chat session with automatic cleanup after 1 hour of inactivity.
     
     Args:
         session_id: Unique identifier for the chat
         user_input: User text prompt
         end: If True, close the chat, return conversation as string, and clear session
     """
+    # Check for inactive sessions (older than 1 hour)
+    current_time = time.time()
+    inactive_sessions = []
+    for sid, session in sessions.items():
+        if current_time - session.get("last_activity", current_time) > 3600:  # 1 hour in seconds
+            inactive_sessions.append(sid)
+    
+    # Save and remove inactive sessions
+    for sid in inactive_sessions:
+        conversation = ""
+        for msg in sessions[sid]["messages"]:
+            conversation += f"Role: {msg['role']}\n"
+            conversation += "Content:\n"
+            conversation += msg['content'] + "\n"
+            conversation += "---\n"
+        del sessions[sid]
+        # Note: conversation string could be stored elsewhere (e.g., database) if needed
+        # For now, we just discard it as per the original logic, but it's available for further use
+
     if end:
         if session_id in sessions:
             # Convert conversation to plain text string
             conversation = ""
             for msg in sessions[session_id]["messages"]:
                 conversation += f"Role: {msg['role']}\n"
-                conversation += f"Content: {msg['content']}\n"
+                conversation += "Content:\n"
+                conversation += msg['content'] + "\n"
                 conversation += "---\n"
             del sessions[session_id]
             return conversation
@@ -128,8 +148,12 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         sessions[session_id] = {
             "messages": [
                 {"role": "system", "content": instructions}
-            ]
+            ],
+            "last_activity": current_time
         }
+
+    # Update last activity timestamp
+    sessions[session_id]["last_activity"] = current_time
 
     # Add user message to session history
     sessions[session_id]["messages"].append({
@@ -146,7 +170,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
             tool_choice="auto"
         )
     except Exception as e:
-        return f"Error calling chat completion: {str(e)}"
+        return {"error": f"Error calling chat completion: {str(e)}"}
 
     # Process the response
     choice = response.choices[0]
@@ -164,7 +188,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                         "tool_call_id": tool_call.id
                     })
                 except Exception as e:
-                    return JSONResponse(status_code=500, content={"message":f"Error processing tool call: {str(e)}"})
+                    return {"error": f"Error processing tool call: {str(e)}"}
             elif tool_call.type == "function" and tool_call.function.name == "add_contact":
                 args = json.loads(tool_call.function.arguments)
                 result = add_contact(
@@ -199,7 +223,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
             )
             response_message = final_response.choices[0].message.content
         except Exception as e:
-            return JSONResponse(status_code=500, content={"message":f"Error submitting tool outputs: {str(e)}"})
+            return {"error": f"Error submitting tool outputs: {str(e)}"}
     else:
         response_message = choice.message.content
 
@@ -208,8 +232,11 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         "role": "assistant",
         "content": response_message
     })
-    return JSONResponse(status_code=200, content={"message": response_message})
 
+    # Update last activity timestamp after successful response
+    sessions[session_id]["last_activity"] = time.time()
+
+    return {"message": response_message}
 
 def resume_chat_session(session_id: str, user_input: str, conversation: str = ""):
     """Resume or start a chat session from a conversation string, continue with new user input, and return updated conversation string.
