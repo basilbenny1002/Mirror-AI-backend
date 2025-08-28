@@ -272,7 +272,6 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
 
 
 def resume_chat_session(contactID: str, user_input: str):
-
     """Resume or start a chat session from a conversation string, continue with new user input, and return updated conversation string.
     
     Args:
@@ -282,7 +281,7 @@ def resume_chat_session(contactID: str, user_input: str):
     """
     # Initialize local messages list
     messages = []
-    conversation =get_conversation(contactID)
+    conversation = get_conversation(contactID)
 
     # Parse conversation string into messages if provided
     if conversation:
@@ -314,11 +313,29 @@ def resume_chat_session(contactID: str, user_input: str):
         )
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+
     # Process the response
     choice = response.choices[0]
     if choice.finish_reason == "tool_calls":
         tool_calls = choice.message.tool_calls
         tool_messages = []
+        
+        # Append the assistant's message *with* tool_calls to the history
+        messages.append({
+            "role": "assistant",
+            "content": choice.message.content or "",
+            "tool_calls": [
+                {
+                    "id": tool_call.id,
+                    "type": tool_call.type,
+                    "function": {
+                        "name": tool_call.function.name,
+                        "arguments": tool_call.function.arguments
+                    }
+                } for tool_call in tool_calls
+            ]
+        })
+
         for tool_call in tool_calls:
             if tool_call.type == "function" and tool_call.function.name == "get_weather":
                 try:
@@ -330,7 +347,7 @@ def resume_chat_session(contactID: str, user_input: str):
                         "tool_call_id": tool_call.id
                     })
                 except Exception as e:
-                    return {"message": f"Error processing tool call: {str(e)}", "conversation": conversation}
+                    return JSONResponse(status_code=500, content={"message": f"Error processing tool call: {str(e)}", "conversation": conversation})
             elif tool_call.type == "function" and tool_call.function.name == "add_contact":
                 args = json.loads(tool_call.function.arguments)
                 result = add_contact(
@@ -346,12 +363,6 @@ def resume_chat_session(contactID: str, user_input: str):
                     "tool_call_id": tool_call.id
                 })
 
-        # Append assistant message (without tool_calls) to history
-        messages.append({
-            "role": "assistant",
-            "content": choice.message.content or ""
-        })
-
         # Append tool response messages to history
         messages.extend(tool_messages)
 
@@ -366,6 +377,7 @@ def resume_chat_session(contactID: str, user_input: str):
             response_message = final_response.choices[0].message.content
         except Exception as e:
             return JSONResponse(status_code=500, content={"error": str(e)})
+
     else:
         response_message = choice.message.content
 
