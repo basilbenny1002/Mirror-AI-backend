@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from app.chat import chat_session
+from app.chat import chat_session, resume_chat_session
 from typing import Optional
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,6 +40,6 @@ def chat(data: ChatRequest):
 @app.post("/resume_chat")
 def resume_chat(data: ResumeChat):
     try:
-        return chat_session(data.sessionID, data.message, data.end if data.end else None )
+        return resume_chat_session(contactID=data.id, user_input=data.reply)
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})

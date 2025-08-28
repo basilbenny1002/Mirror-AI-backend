@@ -246,7 +246,8 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
             )
             response_message = final_response.choices[0].message.content
         except Exception as e:
-            return {"error": f"Error submitting tool outputs: {str(e)}"}
+            return JSONResponse(status_code=500, content={"error": str(e)})
+
     else:
         response_message = choice.message.content
 
@@ -259,11 +260,10 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     # Update last activity timestamp after successful response
     sessions[session_id]["last_activity"] = time.time()
 
-    return {"message": response_message}
+    return JSONResponse(status_code=200, content={"message": response_message})
 
 
-
-def resume_chat_session(contactID: str, user_input: str, conversation: str = ""):
+def resume_chat_session(contactID: str, user_input: str):
 
     """Resume or start a chat session from a conversation string, continue with new user input, and return updated conversation string.
     
@@ -274,6 +274,7 @@ def resume_chat_session(contactID: str, user_input: str, conversation: str = "")
     """
     # Initialize local messages list
     messages = []
+    conversation =get_conversation(contactID)
 
     # Parse conversation string into messages if provided
     if conversation:
@@ -304,8 +305,7 @@ def resume_chat_session(contactID: str, user_input: str, conversation: str = "")
             tool_choice="auto"
         )
     except Exception as e:
-        return {"message": f"Error calling chat completion: {str(e)}", "conversation": conversation}
-
+        return JSONResponse(status_code=500, content={"error": str(e)})
     # Process the response
     choice = response.choices[0]
     if choice.finish_reason == "tool_calls":
@@ -357,7 +357,7 @@ def resume_chat_session(contactID: str, user_input: str, conversation: str = "")
             )
             response_message = final_response.choices[0].message.content
         except Exception as e:
-            return {"message": f"Error submitting tool outputs: {str(e)}", "conversation": conversation}
+            return JSONResponse(status_code=500, content={"error": str(e)})
     else:
         response_message = choice.message.content
 
@@ -375,4 +375,4 @@ def resume_chat_session(contactID: str, user_input: str, conversation: str = "")
         updated_conversation += "---\n"
 
     save_conversation(conversation=updated_conversation, contact_id=contactID)
-    return {"message": response_message}
+    return JSONResponse(status_code=200, content={"message": response_message})
