@@ -20,9 +20,8 @@ class ChatRequest(BaseModel):
     end: Optional[bool] = None
 
 class ResumeChat(BaseModel):
-    history: str
+    id: str
     reply: str
-    user: str
 
 
 @app.get("/")
