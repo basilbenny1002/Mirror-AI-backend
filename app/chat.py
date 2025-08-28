@@ -88,12 +88,8 @@ add_contact_tool = {
                     "type": "string",
                     "description": "Booking status or details about the booked call/meeting. The values must either be 'yes' or 'no'."
                 },
-                "conversation": {
-                    "type": "string",
-                    "description": "Conversation notes or details about prior interactions with the contact."
-                }
             },
-            "required": ["name", "email", "phone", "booked", "conversation"]
+            "required": ["name", "email", "phone", "booked"]
         }
     }
 }
@@ -101,7 +97,6 @@ add_contact_tool = {
 
 # Storage for sessions (session_id to conversation history)
 sessions = {}
-
 
 
 def chat_session(session_id: str, user_input: str, end: bool = False):
@@ -116,7 +111,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     current_time = time.time()
     inactive_sessions = []
     for sid, session in sessions.items():
-        if current_time - session.get("last_activity", current_time) > 3600:  # 1 hour in seconds
+        if current_time - session.get("last_activity", current_time) > 120:  # 1 hour in seconds
             inactive_sessions.append(sid)
     
     # Save and remove inactive sessions
@@ -127,7 +122,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
             conversation += "Content:\n"
             conversation += msg['content'] + "\n"
             conversation += "---\n"
-        # Extract contact details from session if add_contact was called
+        # Extract contact details from session if  add_contact was called
         name, email, phone, booked = None, None, None, None
         for msg in sessions[sid]["messages"]:
             if msg["role"] == "tool" and "add_contact" in msg.get("content", ""):
@@ -165,8 +160,8 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                         pass
             save_conversation(session_id, conversation, name, email, phone, booked)
             del sessions[session_id]
-            return {"message": "Chat session ended and saved."}
-        return {"message": "Chat session ended, no conversation found."}
+            return JSONResponse(status_code=200, content={"message": "Chat session ended and saved."})
+        return JSONResponse(status_code=200, content={"message": "Chat session ended, no conversation found."})
 
     if session_id not in sessions:
         sessions[session_id] = {
@@ -194,13 +189,29 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
             tool_choice="auto"
         )
     except Exception as e:
-        return {"error": f"Error calling chat completion: {str(e)}"}
+        return JSONResponse(status_code=500, content={"error": f"Error calling chat completion: {str(e)}"})
 
     # Process the response
     choice = response.choices[0]
     if choice.finish_reason == "tool_calls":
         tool_calls = choice.message.tool_calls
         tool_messages = []
+        # Append the assistant's message *with* tool_calls to the session history
+        sessions[session_id]["messages"].append({
+            "role": "assistant",
+            "content": choice.message.content or "",
+            "tool_calls": [
+                {
+                    "id": tool_call.id,
+                    "type": tool_call.type,
+                    "function": {
+                        "name": tool_call.function.name,
+                        "arguments": tool_call.function.arguments
+                    }
+                } for tool_call in tool_calls
+            ]
+        })
+
         for tool_call in tool_calls:
             if tool_call.type == "function" and tool_call.function.name == "get_weather":
                 try:
@@ -212,26 +223,22 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                         "tool_call_id": tool_call.id
                     })
                 except Exception as e:
-                    return {"error": f"Error processing tool call: {str(e)}"}
+                    return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
             elif tool_call.type == "function" and tool_call.function.name == "add_contact":
                 args = json.loads(tool_call.function.arguments)
+                print("Add contact called with args:", args, flush=True)
                 result = add_contact(
                     name=args["name"],
                     email=args["email"],
                     phone=args["phone"],
                     booked=args["booked"]
                 )
+                print("Add contact result:", result, flush=True)
                 tool_messages.append({
                     "role": "tool",
                     "content": json.dumps(result),
                     "tool_call_id": tool_call.id
                 })
-
-        # Append assistant message (without tool_calls) to history
-        sessions[session_id]["messages"].append({
-            "role": "assistant",
-            "content": choice.message.content or ""
-        })
 
         # Append tool response messages to history
         sessions[session_id]["messages"].extend(tool_messages)
@@ -261,6 +268,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     sessions[session_id]["last_activity"] = time.time()
 
     return JSONResponse(status_code=200, content={"message": response_message})
+
 
 
 def resume_chat_session(contactID: str, user_input: str):

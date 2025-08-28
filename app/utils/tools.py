@@ -1,5 +1,5 @@
 import random
-from database.insights_db import save_insight, search_insight
+# from database.insights_db import save_insight, search_insight
 import os
 import requests
 from dotenv import load_dotenv
@@ -28,8 +28,7 @@ HEADERS = {
 }
 
 # Replace these with your actual custom field IDs
-BOOKED_FIELD_ID = "abc12345"        # e.g. "Booked Call" field
-CONVERSATION_FIELD_ID = "def67890"  # e.g. "Conversation Notes" field
+BOOKED_FIELD_ID = "r9wLa2H8weqkXfIHgmLA"        # e.g. "Booked Call" field
 
 
 def get_weather(city: str):
@@ -38,7 +37,7 @@ def get_weather(city: str):
     conditions = random.choice(["sunny", "cloudy", "rainy", "windy"])
     return f"The weather in {city} is {temp}°C and {conditions}."
 
-def add_contact(name: str, email: str, phone: str, booked: str, conversation: str):
+def add_contact(name: str, email: str, phone: str, booked: str):
     """
     Add a contact to GoHighLevel with custom fields.
     """
@@ -54,10 +53,10 @@ def add_contact(name: str, email: str, phone: str, booked: str, conversation: st
         "email": email,
         "phone": phone,
         "customField": {
-            "59g21lZwv0U3YJBXtQcc": booked,
+            BOOKED_FIELD_ID: booked,
         }
     }
-
+    
     response = requests.post(GHL_URL, headers=HEADERS, json=payload)
 
     if response.status_code == 200:
@@ -121,3 +120,6 @@ def get_conversation(contact_id):
     """
     doc = conversations_col.find_one({"contact_id": contact_id}, {"_id": 0, "conversation": 1})
     return doc["conversation"] if doc else None
+
+
+# save_conversation(contact_id="eWVjjelB67z7cbrlKkO5", conversation="This is a test conversation.")
