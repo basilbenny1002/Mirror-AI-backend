@@ -39,12 +39,28 @@ except Exception as e:
 
 company_name = "Leadify"
 company_specialization = "lead generation"
-company_documentation = pdf_text  # Assuming 'pdf_text' is the variable from your original code containing the extracted PDF text
+company_documentation = pdf_text 
 additional_info = """
 Leadify specializes in scraping Twitch to identify high-potential leads, such as streamers and content creators, and filtering them based on criteria like viewer count, engagement rates, content categories, or custom brand requirements. This enables brands to efficiently connect with a large number of creators for sponsorships, influencer partnerships, marketing campaigns, or community growth. For example, if a brand needs gaming influencers with 1,000+ average viewers for a campaign, Leadify’s process identifies, filters, and streamlines outreach to maximize ROI. Benefits include time savings, precise targeting, and scalable outreach, allowing brands to build impactful partnerships quickly.
 """
+placeholders = {
+    "_COMPANY_NAME_": company_name,
+    "_COMPANY_SPECIALIZATION_": company_specialization,
+    "_COMPANY_DOCUMENTATION_": company_documentation,
+    "_ADDITIONAL_INFO_": additional_info
+}
+instructions_template_oneline = os.getenv("INSTRUCTIONS_TEMPLATE")
 
-# The full dynamic system prompt as a multi-line string, formatted with the variables
+# Step 1: Replace the escaped newline characters (\\n) with actual newline characters (\n)
+instructions_with_newlines = instructions_template_oneline.replace("\\n", "\n")
+
+final_instructions = instructions_with_newlines
+for placeholder, value in placeholders.items():
+    if value is not None:
+        final_instructions = final_instructions.replace(placeholder, value)
+
+
+instructions = final_instructions
 
 # Define the get_weather tool
 weather_tool = {
