@@ -56,3 +56,50 @@ def add_contact(name: str, email: str, phone: str, booked: str, conversation: st
         return {"status": "success", "data": response.json()}
     else:
         return {"status": "error", "code": response.status_code, "message": response.text}
+    
+def save_conversation(conversation, name=None, email=None, phone=None, booked=None):
+    """
+    Save a conversation note to an existing contact in GHL.
+    Requires at least one unique identifier: email or phone.
+    """
+
+    if not conversation or (not email and not phone):
+        print("Missing required info: conversation and either email or phone must be provided.")
+        return
+
+    # Step 1: Search for the contact
+    params = {}
+    if email:
+        params["email"] = email
+    if phone:
+        params["phone"] = phone
+
+    search_resp = requests.get(GHL_URL, headers=HEADERS, params=params)
+
+    if search_resp.status_code != 200:
+        print(f"Error searching contact: {search_resp.text}")
+        return
+
+    contacts = search_resp.json().get("contacts", [])
+    if not contacts:
+        print("No contact found with provided details.")
+        return
+
+    contact_id = contacts[0]["id"]  # assuming first match is correct
+
+    # Step 2: Update the conversation field
+    payload = {
+        "customField": {
+            CONVERSATION_FIELD_ID: conversation
+        }
+    }
+
+    update_url = f"{GHL_URL}{contact_id}"
+    update_resp = requests.put(update_url, headers=HEADERS, json=payload)
+
+    if update_resp.status_code == 200:
+        print("Conversation saved successfully.")
+        return update_resp.json()
+    else:
+        print(f"Failed to save conversation: {update_resp.text}")
+        return None

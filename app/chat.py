@@ -110,7 +110,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     Args:
         session_id: Unique identifier for the chat
         user_input: User text prompt
-        end: If True, close the chat, return conversation as string, and clear session
+        end: If True, close the chat, call save_conversation with details, and clear session
     """
     # Check for inactive sessions (older than 1 hour)
     current_time = time.time()
@@ -127,9 +127,20 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
             conversation += "Content:\n"
             conversation += msg['content'] + "\n"
             conversation += "---\n"
+        # Extract contact details from session if add_contact was called
+        name, email, phone, booked = None, None, None, None
+        for msg in sessions[sid]["messages"]:
+            if msg["role"] == "tool" and "add_contact" in msg.get("content", ""):
+                try:
+                    result = json.loads(msg["content"])
+                    name = result.get("name")
+                    email = result.get("email")
+                    phone = result.get("phone")
+                    booked = result.get("booked")
+                except json.JSONDecodeError:
+                    pass
+        save_conversation(sid, conversation, name, email, phone, booked)
         del sessions[sid]
-        # Note: conversation string could be stored elsewhere (e.g., database) if needed
-        # For now, we just discard it as per the original logic, but it's available for further use
 
     if end:
         if session_id in sessions:
@@ -140,9 +151,22 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                 conversation += "Content:\n"
                 conversation += msg['content'] + "\n"
                 conversation += "---\n"
+            # Extract contact details from session if add_contact was called
+            name, email, phone, booked = None, None, None, None
+            for msg in sessions[session_id]["messages"]:
+                if msg["role"] == "tool" and "add_contact" in msg.get("content", ""):
+                    try:
+                        result = json.loads(msg["content"])
+                        name = result.get("name")
+                        email = result.get("email")
+                        phone = result.get("phone")
+                        booked = result.get("booked")
+                    except json.JSONDecodeError:
+                        pass
+            save_conversation(session_id, conversation, name, email, phone, booked)
             del sessions[session_id]
-            return conversation
-        return "Chat session ended, no conversation found."
+            return {"message": "Chat session ended and saved."}
+        return {"message": "Chat session ended, no conversation found."}
 
     if session_id not in sessions:
         sessions[session_id] = {
@@ -195,12 +219,11 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                     name=args["name"],
                     email=args["email"],
                     phone=args["phone"],
-                    booked=args["booked"],
-                    conversation=args["conversation"]
+                    booked=args["booked"]
                 )
                 tool_messages.append({
                     "role": "tool",
-                    "content": json.dumps(result),  # always return JSON as string
+                    "content": json.dumps(result),
                     "tool_call_id": tool_call.id
                 })
 
@@ -237,6 +260,8 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     sessions[session_id]["last_activity"] = time.time()
 
     return {"message": response_message}
+
+
 
 def resume_chat_session(session_id: str, user_input: str, conversation: str = ""):
     """Resume or start a chat session from a conversation string, continue with new user input, and return updated conversation string.
