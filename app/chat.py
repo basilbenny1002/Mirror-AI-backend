@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from fastapi.responses import JSONResponse
 import PyPDF2
-from app.utils.tools import get_weather, add_contact
+from app.utils.tools import get_weather, add_contact, get_conversation, save_conversation
 from pathlib import Path
 # Load environment variables
 load_dotenv()
@@ -82,11 +82,11 @@ add_contact_tool = {
                 },
                 "phone": {
                     "type": "string",
-                    "description": "Phone number of the contact in E.164 format (+countrycodexxxxxxxxxx)."
+                    "description": "Phone number of the contact in E.164 format (+countrycode)."
                 },
                 "booked": {
                     "type": "string",
-                    "description": "Booking status or details about the booked call/meeting."
+                    "description": "Booking status or details about the booked call/meeting. The values must either be 'yes' or 'no'."
                 },
                 "conversation": {
                     "type": "string",
@@ -263,7 +263,8 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
 
 
 
-def resume_chat_session(session_id: str, user_input: str, conversation: str = ""):
+def resume_chat_session(contactID: str, user_input: str, conversation: str = ""):
+
     """Resume or start a chat session from a conversation string, continue with new user input, and return updated conversation string.
     
     Args:
@@ -373,4 +374,5 @@ def resume_chat_session(session_id: str, user_input: str, conversation: str = ""
         updated_conversation += f"Content: {msg['content']}\n"
         updated_conversation += "---\n"
 
-    return {"message": response_message, "conversation": updated_conversation}
+    save_conversation(conversation=updated_conversation, contact_id=contactID)
+    return {"message": response_message}

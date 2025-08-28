@@ -3,10 +3,19 @@ from database.insights_db import save_insight, search_insight
 import os
 import requests
 from dotenv import load_dotenv
+from pymongo import MongoClient
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
 API_KEY = os.getenv("GHL_API_KEY")
+
+# Mongo setup (put your URI in .env as MONGO_URI)
+MONGO_URI = os.getenv("MONGO_URI")
+client = MongoClient(MONGO_URI)
+db = client["ghl_contacts"]
+conversations_col = db["conversations"]
+
 
 if not API_KEY:
     raise ValueError("GHL_API_KEY not found in .env file")
@@ -45,8 +54,7 @@ def add_contact(name: str, email: str, phone: str, booked: str, conversation: st
         "email": email,
         "phone": phone,
         "customField": {
-            BOOKED_FIELD_ID: booked,
-            CONVERSATION_FIELD_ID: conversation
+            "59g21lZwv0U3YJBXtQcc": booked,
         }
     }
 
@@ -57,49 +65,59 @@ def add_contact(name: str, email: str, phone: str, booked: str, conversation: st
     else:
         return {"status": "error", "code": response.status_code, "message": response.text}
     
-def save_conversation(conversation, name=None, email=None, phone=None, booked=None):
+
+def save_conversation(conversation, name=None, email=None, phone=None, booked=None, contact_id=None):
     """
-    Save a conversation note to an existing contact in GHL.
-    Requires at least one unique identifier: email or phone.
+    Find contact in GHL, then save conversation to MongoDB.
+    Overwrites old conversation if contact_id already exists.
     """
-
-    if not conversation or (not email and not phone):
-        print("Missing required info: conversation and either email or phone must be provided.")
+    if contact_id:
+        conversations_col.update_one(
+        {"contact_id": contact_id},
+        {"$set": {"conversation": conversation}},
+        upsert=True
+    )
+        print(f"Conversation saved in MongoDB for contact_id {contact_id}")
         return
-
-    # Step 1: Search for the contact
-    params = {}
-    if email:
-        params["email"] = email
-    if phone:
-        params["phone"] = phone
-
-    search_resp = requests.get(GHL_URL, headers=HEADERS, params=params)
-
-    if search_resp.status_code != 200:
-        print(f"Error searching contact: {search_resp.text}")
-        return
-
-    contacts = search_resp.json().get("contacts", [])
-    if not contacts:
-        print("No contact found with provided details.")
-        return
-
-    contact_id = contacts[0]["id"]  # assuming first match is correct
-
-    # Step 2: Update the conversation field
-    payload = {
-        "customField": {
-            CONVERSATION_FIELD_ID: conversation
-        }
-    }
-
-    update_url = f"{GHL_URL}{contact_id}"
-    update_resp = requests.put(update_url, headers=HEADERS, json=payload)
-
-    if update_resp.status_code == 200:
-        print("Conversation saved successfully.")
-        return update_resp.json()
     else:
-        print(f"Failed to save conversation: {update_resp.text}")
-        return None
+        if not conversation or (not email and not phone):
+            print("Missing required info: conversation and either email or phone must be provided.")
+            return
+
+        # Step 1: Search for the contact in GHL
+        params = {}
+        if email:
+            params["email"] = email
+        if phone:
+            params["phone"] = phone
+
+        search_resp = requests.get(GHL_URL, headers=HEADERS, params=params)
+
+        if search_resp.status_code != 200:
+            print(f"Error searching contact: {search_resp.text}")
+            return
+
+        contacts = search_resp.json().get("contacts", [])
+        if not contacts:
+            print("No contact found with provided details.")
+            return
+
+        contact_id = contacts[0]["id"]
+
+        # Step 2: Upsert conversation (overwrite if exists)
+        conversations_col.update_one(
+            {"contact_id": contact_id},
+            {"$set": {"conversation": conversation}},
+            upsert=True
+        )
+
+        print(f"Conversation saved in MongoDB for contact_id {contact_id}")
+
+
+def get_conversation(contact_id):
+    """
+    Retrieve only the conversation string for a given contact_id.
+    Returns None if not found.
+    """
+    doc = conversations_col.find_one({"contact_id": contact_id}, {"_id": 0, "conversation": 1})
+    return doc["conversation"] if doc else None
