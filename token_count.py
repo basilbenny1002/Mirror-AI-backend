@@ -210,52 +210,52 @@
 # print(query_refund_policy("Can I get a cash refund if I cancel my subscription?", collection))
 # print(query_refund_policy("What happens if I report an issue within 30 days?", collection))
 
-import os
-import requests
-from dotenv import load_dotenv
+# import os
+# import requests
+# from dotenv import load_dotenv
 
-# Load environment variables from .env
-load_dotenv()
-API_KEY = os.getenv("GHL_API_KEY")
+# # Load environment variables from .env
+# load_dotenv()
+# API_KEY = os.getenv("GHL_API_KEY")
 
-if not API_KEY:
-    raise ValueError("GHL_API_KEY not found in .env file")
+# if not API_KEY:
+#     raise ValueError("GHL_API_KEY not found in .env file")
 
-# GHL API endpoint
-url = "https://rest.gohighlevel.com/v1/contacts/"
+# # GHL API endpoint
+# url = "https://rest.gohighlevel.com/v1/contacts/"
 
-# Headers with API Key
-headers = {
-    "Authorization": f"Bearer {API_KEY}",
-    "Content-Type": "application/json"
-}
+# # Headers with API Key
+# headers = {
+#     "Authorization": f"Bearer {API_KEY}",
+#     "Content-Type": "application/json"
+# }
 
-# Sample contact info with custom fields
-"""
-{
-  "firstName": "Potato",
-  "lastName": "man",
-  "email": "Potato.man@example.com",
-  "phone": "+5656565656",
-  "customField": {
-      "customFieldIdHere": "Custom field value",
-      "anotherCustomFieldIdHere": "Another value"
-  }
-}
+# # Sample contact info with custom fields
+# """
+# {
+#   "firstName": "Potato",
+#   "lastName": "man",
+#   "email": "Potato.man@example.com",
+#   "phone": "+5656565656",
+#   "customField": {
+#       "customFieldIdHere": "Custom field value",
+#       "anotherCustomFieldIdHere": "Another value"
+#   }
+# }
 
-"""
+# """
 
-payload = {
-    "firstName": "Potato",
-    "lastName": "man",
-    "email": "Potato.man@example.com",
-    "phone": "+5656565656"  # <- Use E.164 format (+countrycode number)
-}
+# payload = {
+#     "firstName": "Potato",
+#     "lastName": "man",
+#     "email": "Potato.man@example.com",
+#     "phone": "+5656565656"  # <- Use E.164 format (+countrycode number)
+# }
 
-# Send request
-response = requests.post(url, headers=headers, json=payload)
+# # Send request
+# response = requests.post(url, headers=headers, json=payload)
 
-if response.status_code == 200:
-    print(" Contact added successfully:", response.json())
-else:
-    print(" Error:", response.status_code, response.text)
+# if response.status_code == 200:
+#     print(" Contact added successfully:", response.json())
+# else:
+#     print(" Error:", response.status_code, response.text)
