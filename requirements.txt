@@ -1,7 +1,9 @@
-fastapi
+fastapi[standard]
+uvicorn[standard]
 pydantic
 python-dotenv
 openai
 google-genai
-fastapi[standard]
-uvicorn[standard]
+PyPDF2
+requests
+pymongo
