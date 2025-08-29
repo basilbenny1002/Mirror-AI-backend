@@ -295,7 +295,7 @@ def resume_chat_session(contactID: str, user_input: str, followup_stage: str = "
         user_input: New user text prompt
         conversation: String containing the previous conversation (optional)
     """
-    welcome_message = os.getenv("WELCOME_MESSAGE")
+    welcome_message = final_instructions
     if followup_stage:
         instructions = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
     # Initialize local messages list
@@ -316,6 +316,7 @@ def resume_chat_session(contactID: str, user_input: str, followup_stage: str = "
         # Start new session with welcome message and stage instructions
         messages.append({"role": "system", "content": welcome_message})
         if followup_stage:
+            instructions = os.getenv(f"FOLLOWUP_STAGE_0")
             messages.append({"role": "system", "content": instructions})
 
     # Add new user message
