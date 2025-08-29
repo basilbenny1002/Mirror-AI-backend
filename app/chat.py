@@ -320,7 +320,41 @@ def resume_chat_session(contactID: str, user_input: str, followup_stage: str = "
             instructions = os.getenv(f"FOLLOWUP_STAGE_0")
             messages.append({"role": "system", "content": instructions})
 
-    # Add new user message
+    # Add followup stage instructions for non-zero stages
+    if followup_stage and followup_stage != "0":
+        instructions = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
+        if instructions:
+            messages.append({"role": "system", "content": instructions})
+            # If no user_input, send the followup instructions to the LLM
+            if not user_input:
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=messages,
+                        tools=[weather_tool, add_contact_tool],
+                        tool_choice="auto"
+                    )
+                    response_message = response.choices[0].message.content
+
+                    # Append assistant response to session history
+                    messages.append({
+                        "role": "assistant",
+                        "content": response_message
+                    })
+
+                    # Convert updated conversation to string
+                    updated_conversation = ""
+                    for msg in messages:
+                        updated_conversation += f"Role: {msg['role']}\n"
+                        updated_conversation += f"Content: {msg['content']}\n"
+                        updated_conversation += "---\n"
+
+                    save_conversation(conversation=updated_conversation, contact_id=contactID)
+                    return JSONResponse(status_code=200, content={"message": response_message})
+                except Exception as e:
+                    return JSONResponse(status_code=500, content={"error": str(e)})
+
+    # Add new user message if provided
     if user_input:
         messages.append({
             "role": "user",
