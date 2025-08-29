@@ -127,7 +127,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     current_time = time.time()
     inactive_sessions = []
     for sid, session in sessions.items():
-        if current_time - session.get("last_activity", current_time) > 120:  # 1 hour in seconds
+        if current_time - session.get("last_activity", current_time) > 3600:  # 1 hour in seconds
             inactive_sessions.append(sid)
     
     # Save and remove inactive sessions
@@ -138,7 +138,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
             conversation += "Content:\n"
             conversation += msg['content'] + "\n"
             conversation += "---\n"
-        # Extract contact details from session if  add_contact was called
+        # Extract contact details from session if add_contact was called
         name, email, phone, booked = None, None, None, None
         for msg in sessions[sid]["messages"]:
             if msg["role"] == "tool" and "add_contact" in msg.get("content", ""):
@@ -152,6 +152,28 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                     pass
         save_conversation(sid, conversation, name, email, phone, booked)
         del sessions[sid]
+
+    # Save conversation for current session if add_contact was called
+    if session_id in sessions:
+        conversation = ""
+        for msg in sessions[session_id]["messages"]:
+            conversation += f"Role: {msg['role']}\n"
+            conversation += "Content:\n"
+            conversation += msg['content'] + "\n"
+            conversation += "---\n"
+        name, email, phone, booked = None, None, None, None
+        for msg in sessions[session_id]["messages"]:
+            if msg["role"] == "tool" and "add_contact" in msg.get("content", ""):
+                try:
+                    result = json.loads(msg["content"])
+                    name = result.get("name")
+                    email = result.get("email")
+                    phone = result.get("phone")
+                    booked = result.get("booked")
+                except json.JSONDecodeError:
+                    pass
+        if name or email or phone or booked:  # Save only if contact details exist
+            save_conversation(session_id, conversation, name, email, phone, booked)
 
     if end:
         if session_id in sessions:
@@ -282,6 +304,28 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
 
     # Update last activity timestamp after successful response
     sessions[session_id]["last_activity"] = time.time()
+
+    # Save conversation again after new message if add_contact was called
+    if session_id in sessions:
+        conversation = ""
+        for msg in sessions[session_id]["messages"]:
+            conversation += f"Role: {msg['role']}\n"
+            conversation += "Content:\n"
+            conversation += msg['content'] + "\n"
+            conversation += "---\n"
+        name, email, phone, booked = None, None, None, None
+        for msg in sessions[session_id]["messages"]:
+            if msg["role"] == "tool" and "add_contact" in msg.get("content", ""):
+                try:
+                    result = json.loads(msg["content"])
+                    name = result.get("name")
+                    email = result.get("email")
+                    phone = result.get("phone")
+                    booked = result.get("booked")
+                except json.JSONDecodeError:
+                    pass
+        if name or email or phone or booked:  # Save only if contact details exist
+            save_conversation(session_id, conversation, name, email, phone, booked)
 
     return JSONResponse(status_code=200, content={"message": response_message})
 
