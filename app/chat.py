@@ -298,6 +298,7 @@ def resume_chat_session(contactID: str, user_input: str, followup_stage: str = "
     welcome_message = final_instructions
     if followup_stage:
         instructions = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
+        print(f"Followup stage {followup_stage} instructions: {instructions} ", flush=True)
     # Initialize local messages list
     messages = []
     conversation = get_conversation(contactID)
