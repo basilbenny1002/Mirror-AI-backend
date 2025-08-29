@@ -287,7 +287,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
 
 
 
-def resume_chat_session(contactID: str, user_input: str):
+def resume_chat_session(contactID: str, user_input: str, followup_stage: str = ""):
     """Resume or start a chat session from a conversation string, continue with new user input, and return updated conversation string.
     
     Args:
@@ -295,6 +295,9 @@ def resume_chat_session(contactID: str, user_input: str):
         user_input: New user text prompt
         conversation: String containing the previous conversation (optional)
     """
+    welcome_message = os.getenv("WELCOME_MESSAGE")
+    if followup_stage:
+        instructions = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
     # Initialize local messages list
     messages = []
     conversation = get_conversation(contactID)
@@ -310,14 +313,17 @@ def resume_chat_session(contactID: str, user_input: str):
             content_start = lines[1].replace("Content: ", "").strip()
             messages.append({"role": role, "content": content_start})
     else:
-        # Start new session with system instructions
-        messages.append({"role": "system", "content": instructions})
+        # Start new session with welcome message and stage instructions
+        messages.append({"role": "system", "content": welcome_message})
+        if followup_stage:
+            messages.append({"role": "system", "content": instructions})
 
     # Add new user message
-    messages.append({
-        "role": "user",
-        "content": user_input
-    })
+    if user_input:
+        messages.append({
+            "role": "user",
+            "content": user_input
+        })
 
     # Prepare the API request
     try:
