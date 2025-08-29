@@ -115,6 +115,16 @@ add_contact_tool = {
 sessions = {}
 
 
+def convert_messages_to_string(messages):
+    """Convert session messages to a formatted string."""
+    conversation = ""
+    for msg in messages:
+        conversation += f"Role: {msg['role']}\n"
+        conversation += "Content:\n"
+        conversation += msg['content'] + "\n"
+        conversation += "---\n"
+    return conversation
+
 def chat_session(session_id: str, user_input: str, end: bool = False):
     """Manage a chat session with automatic cleanup after 1 hour of inactivity.
     
@@ -132,71 +142,83 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     
     # Save and remove inactive sessions
     for sid in inactive_sessions:
-        conversation = ""
-        for msg in sessions[sid]["messages"]:
-            conversation += f"Role: {msg['role']}\n"
-            conversation += "Content:\n"
-            conversation += msg['content'] + "\n"
-            conversation += "---\n"
+        conversation = convert_messages_to_string(sessions[sid]["messages"])
         # Extract contact details from session if add_contact was called
-        name, email, phone, booked = None, None, None, None
-        for msg in sessions[sid]["messages"]:
-            if msg["role"] == "tool" and "add_contact" in msg.get("content", ""):
-                try:
-                    result = json.loads(msg["content"])
-                    name = result.get("name")
-                    email = result.get("email")
-                    phone = result.get("phone")
-                    booked = result.get("booked")
-                except json.JSONDecodeError:
-                    pass
-        save_conversation(sid, conversation, name, email, phone, booked)
+        name, email, phone, booked, contact_id = None, None, None, None, None
+        for i, msg in enumerate(sessions[sid]["messages"]):
+            if msg["role"] == "tool" and "tool_call_id" in msg:
+                # Look for the preceding assistant message with tool_calls
+                if i > 0 and sessions[sid]["messages"][i-1]["role"] == "assistant" and "tool_calls" in sessions[sid]["messages"][i-1]:
+                    for tool_call in sessions[sid]["messages"][i-1]["tool_calls"]:
+                        if tool_call["function"]["name"] == "add_contact":
+                            try:
+                                result = json.loads(msg["content"])
+                                print("Extracted add_contact result for inactive session:", result, flush=True)
+                                contact = result.get("data", {}).get("contact", {})
+                                name = contact.get("fullNameLowerCase")
+                                email = contact.get("email")
+                                phone = contact.get("phone")
+                                booked = contact.get("customField", [{}])[0].get("fieldValue")
+                                contact_id = contact.get("id")
+                            except json.JSONDecodeError as e:
+                                print("JSON decode error in inactive session add_contact parsing:", str(e), flush=True)
+        if name or email or phone or booked or contact_id:
+            print("Saving inactive session with contact details:", flush=True)
+            print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Contact ID: {contact_id}", flush=True)
+            save_conversation(conversation, name, email, phone, booked, contact_id)
         del sessions[sid]
 
     # Save conversation for current session if add_contact was called
     if session_id in sessions:
-        conversation = ""
-        for msg in sessions[session_id]["messages"]:
-            conversation += f"Role: {msg['role']}\n"
-            conversation += "Content:\n"
-            conversation += msg['content'] + "\n"
-            conversation += "---\n"
-        name, email, phone, booked = None, None, None, None
-        for msg in sessions[session_id]["messages"]:
-            if msg["role"] == "tool" and "add_contact" in msg.get("content", ""):
-                try:
-                    result = json.loads(msg["content"])
-                    name = result.get("name")
-                    email = result.get("email")
-                    phone = result.get("phone")
-                    booked = result.get("booked")
-                except json.JSONDecodeError:
-                    pass
-        if name or email or phone or booked:  # Save only if contact details exist
-            save_conversation(session_id, conversation, name, email, phone, booked)
+        conversation = convert_messages_to_string(sessions[session_id]["messages"])
+        name, email, phone, booked, contact_id = None, None, None, None, None
+        for i, msg in enumerate(sessions[session_id]["messages"]):
+            if msg["role"] == "tool" and "tool_call_id" in msg:
+                # Look for the preceding assistant message with tool_calls
+                if i > 0 and sessions[session_id]["messages"][i-1]["role"] == "assistant" and "tool_calls" in sessions[session_id]["messages"][i-1]:
+                    for tool_call in sessions[session_id]["messages"][i-1]["tool_calls"]:
+                        if tool_call["function"]["name"] == "add_contact":
+                            try:
+                                result = json.loads(msg["content"])
+                                print("Extracted add_contact result for current session:", result, flush=True)
+                                contact = result.get("data", {}).get("contact", {})
+                                name = contact.get("fullNameLowerCase")
+                                email = contact.get("email")
+                                phone = contact.get("phone")
+                                booked = contact.get("customField", [{}])[0].get("fieldValue")
+                                contact_id = contact.get("id")
+                            except json.JSONDecodeError as e:
+                                print("JSON decode error in current session add_contact parsing:", str(e), flush=True)
+        if name or email or phone or booked or contact_id:
+            print("Saving current session with contact details:", flush=True)
+            print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Contact ID: {contact_id}", flush=True)
+            save_conversation(conversation, name, email, phone, booked, contact_id)
 
     if end:
         if session_id in sessions:
-            # Convert conversation to plain text string
-            conversation = ""
-            for msg in sessions[session_id]["messages"]:
-                conversation += f"Role: {msg['role']}\n"
-                conversation += "Content:\n"
-                conversation += msg['content'] + "\n"
-                conversation += "---\n"
+            conversation = convert_messages_to_string(sessions[session_id]["messages"])
             # Extract contact details from session if add_contact was called
-            name, email, phone, booked = None, None, None, None
-            for msg in sessions[session_id]["messages"]:
-                if msg["role"] == "tool" and "add_contact" in msg.get("content", ""):
-                    try:
-                        result = json.loads(msg["content"])
-                        name = result.get("name")
-                        email = result.get("email")
-                        phone = result.get("phone")
-                        booked = result.get("booked")
-                    except json.JSONDecodeError:
-                        pass
-            save_conversation(session_id, conversation, name, email, phone, booked)
+            name, email, phone, booked, contact_id = None, None, None, None, None
+            for i, msg in enumerate(sessions[session_id]["messages"]):
+                if msg["role"] == "tool" and "tool_call_id" in msg:
+                    if i > 0 and sessions[session_id]["messages"][i-1]["role"] == "assistant" and "tool_calls" in sessions[session_id]["messages"][i-1]:
+                        for tool_call in sessions[session_id]["messages"][i-1]["tool_calls"]:
+                            if tool_call["function"]["name"] == "add_contact":
+                                try:
+                                    result = json.loads(msg["content"])
+                                    print("Extracted add_contact result for ending session:", result, flush=True)
+                                    contact = result.get("data", {}).get("contact", {})
+                                    name = contact.get("fullNameLowerCase")
+                                    email = contact.get("email")
+                                    phone = contact.get("phone")
+                                    booked = contact.get("customField", [{}])[0].get("fieldValue")
+                                    contact_id = contact.get("id")
+                                except json.JSONDecodeError as e:
+                                    print("JSON decode error in ending session add_contact parsing:", str(e), flush=True)
+            if name or email or phone or booked or contact_id:
+                print("Saving ending session with contact details:", flush=True)
+                print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Contact ID: {contact_id}", flush=True)
+            save_conversation(conversation, name, email, phone, booked, contact_id)
             del sessions[session_id]
             return JSONResponse(status_code=200, content={"message": "Chat session ended and saved."})
         return JSONResponse(status_code=200, content={"message": "Chat session ended, no conversation found."})
@@ -233,6 +255,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     choice = response.choices[0]
     if choice.finish_reason == "tool_calls":
         tool_calls = choice.message.tool_calls
+        print("Tool calls received:", [tool_call.function.name for tool_call in tool_calls], flush=True)
         tool_messages = []
         # Append the assistant's message *with* tool_calls to the session history
         sessions[session_id]["messages"].append({
@@ -277,6 +300,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                     "content": json.dumps(result),
                     "tool_call_id": tool_call.id
                 })
+        print("Tool messages to append:", tool_messages, flush=True)
 
         # Append tool response messages to history
         sessions[session_id]["messages"].extend(tool_messages)
@@ -307,28 +331,30 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
 
     # Save conversation again after new message if add_contact was called
     if session_id in sessions:
-        conversation = ""
-        for msg in sessions[session_id]["messages"]:
-            conversation += f"Role: {msg['role']}\n"
-            conversation += "Content:\n"
-            conversation += msg['content'] + "\n"
-            conversation += "---\n"
-        name, email, phone, booked = None, None, None, None
-        for msg in sessions[session_id]["messages"]:
-            if msg["role"] == "tool" and "add_contact" in msg.get("content", ""):
-                try:
-                    result = json.loads(msg["content"])
-                    name = result.get("name")
-                    email = result.get("email")
-                    phone = result.get("phone")
-                    booked = result.get("booked")
-                except json.JSONDecodeError:
-                    pass
-        if name or email or phone or booked:  # Save only if contact details exist
-            save_conversation(session_id, conversation, name, email, phone, booked)
+        conversation = convert_messages_to_string(sessions[session_id]["messages"])
+        name, email, phone, booked, contact_id = None, None, None, None, None
+        for i, msg in enumerate(sessions[session_id]["messages"]):
+            if msg["role"] == "tool" and "tool_call_id" in msg:
+                if i > 0 and sessions[session_id]["messages"][i-1]["role"] == "assistant" and "tool_calls" in sessions[session_id]["messages"][i-1]:
+                    for tool_call in sessions[session_id]["messages"][i-1]["tool_calls"]:
+                        if tool_call["function"]["name"] == "add_contact":
+                            try:
+                                result = json.loads(msg["content"])
+                                print("Extracted add_contact result for post-message save:", result, flush=True)
+                                contact = result.get("data", {}).get("contact", {})
+                                name = contact.get("fullNameLowerCase")
+                                email = contact.get("email")
+                                phone = contact.get("phone")
+                                booked = contact.get("customField", [{}])[0].get("fieldValue")
+                                contact_id = contact.get("id")
+                            except json.JSONDecodeError as e:
+                                print("JSON decode error in post-message add_contact parsing:", str(e), flush=True)
+        if name or email or phone or booked or contact_id:
+            print("Saving post-message session with contact details:", flush=True)
+            print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Contact ID: {contact_id}", flush=True)
+            save_conversation(conversation, name, email, phone, booked, contact_id)
 
     return JSONResponse(status_code=200, content={"message": response_message})
-
 
 
 def resume_chat_session(contactID: str, user_input: str, followup_stage: str = ""):

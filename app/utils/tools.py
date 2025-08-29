@@ -80,7 +80,7 @@ def save_conversation(conversation, name=None, email=None, phone=None, booked=No
         return
     else:
         if not conversation or (not email and not phone):
-            print("Missing required info: conversation and either email or phone must be provided.")
+            print("Missing required info: conversation and either email or phone must be provided.", flush=True)
             return
 
         # Step 1: Search for the contact in GHL
@@ -110,7 +110,7 @@ def save_conversation(conversation, name=None, email=None, phone=None, booked=No
             upsert=True
         )
 
-        print(f"Conversation saved in MongoDB for contact_id {contact_id}")
+        print(f"Conversation saved in MongoDB for contact_id {contact_id}", flush=True)
 
 
 def get_conversation(contact_id):
