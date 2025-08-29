@@ -314,14 +314,12 @@ def resume_chat_session(contactID: str, user_input: str, followup_stage: str = "
             content_start = lines[1].replace("Content: ", "").strip()
             messages.append({"role": role, "content": content_start})
     else:
-        # Start new session with welcome message and stage instructions
+        # Start new session with welcome message and stage 0 instructions
         messages.append({"role": "system", "content": welcome_message})
-        if followup_stage:
-            instructions = os.getenv(f"FOLLOWUP_STAGE_0")
-            messages.append({"role": "system", "content": instructions})
-
-    # For stage 0, process instructions even without user input
-    if followup_stage == "0" and not user_input:
+        instructions = os.getenv(f"FOLLOWUP_STAGE_0")
+        messages.append({"role": "system", "content": instructions})
+        
+        # For stage 0 (no conversation), process instructions and return response
         try:
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -350,7 +348,7 @@ def resume_chat_session(contactID: str, user_input: str, followup_stage: str = "
             return JSONResponse(status_code=500, content={"error": str(e)})
 
     # Add followup stage instructions for non-zero stages
-    if followup_stage and followup_stage != "0":
+    if followup_stage:
         instructions = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
         if instructions:
             messages.append({"role": "system", "content": instructions})
