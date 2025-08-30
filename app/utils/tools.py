@@ -183,4 +183,4 @@ def get_current_utc_datetime() -> dict:
 # # save_conversation(contact_id="eWVjjelB67z7cbrlKkO5", conversation="This is a test conversation.")
 # print(get_current_utc_datetime())
 
-print(get_available_time_slots("2025-08-31 10:00:00", "2025-09-06 10:00:00"))
+# print(get_available_time_slots("2025-08-31 10:00:00", "2025-09-06 10:00:00"))
