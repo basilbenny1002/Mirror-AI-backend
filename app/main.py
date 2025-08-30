@@ -35,7 +35,7 @@ def chat(data: ChatRequest):
     try:
         return chat_session(data.sessionID, data.message, data.end if data.end else None )
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error":f"main error aaaaaa {str(e)}"})
     
 @app.post("/resume_chat")
 def resume_chat(data: ResumeChat):

@@ -364,3 +364,25 @@
 #             break
 #         response = chat_session(session_id, user_input)
 #         print("Assistant:", response)
+
+# from datetime import datetime
+
+# # Get the current date and time
+# current_datetime = datetime.now()
+
+# # Print the current date and time in its default format (YYYY-MM-DD HH:MM:SS.microseconds)
+# print("Current Date and Time:", current_datetime)
+
+import http.client
+
+conn = http.client.HTTPSConnection("services.leadconnectorhq.com")
+payload = ''
+headers = {
+  'Accept': 'application/json',
+  'Version': '2021-04-15',
+  'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb2NhdGlvbl9pZCI6InRQak5RcmYwcHFiSUVTcGU3T25rIiwidmVyc2lvbiI6MSwiaWF0IjoxNzU2MDU5MjYxNDQ0LCJzdWIiOiJQY2RKSkliMlJ0RFhiN0F3Y2VudiJ9.FEYh5MkPpB7xKSTV39ynfhXiRaBn_RBp1NZACJYBaT8'
+}
+conn.request("GET", "/calendars/3Y9CwpxIzqZgKUCXoyGc/free-slots?startDate=1756571400000&endDate=1757176200000&timezone=UTC", payload, headers)
+res = conn.getresponse()
+data = res.read()
+print(data.decode("utf-8"))
