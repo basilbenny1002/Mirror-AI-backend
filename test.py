@@ -373,16 +373,45 @@
 # # Print the current date and time in its default format (YYYY-MM-DD HH:MM:SS.microseconds)
 # print("Current Date and Time:", current_datetime)
 
-import http.client
+# import http.client
 
-conn = http.client.HTTPSConnection("services.leadconnectorhq.com")
-payload = ''
-headers = {
-  'Accept': 'application/json',
-  'Version': '2021-04-15',
-  'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb2NhdGlvbl9pZCI6InRQak5RcmYwcHFiSUVTcGU3T25rIiwidmVyc2lvbiI6MSwiaWF0IjoxNzU2MDU5MjYxNDQ0LCJzdWIiOiJQY2RKSkliMlJ0RFhiN0F3Y2VudiJ9.FEYh5MkPpB7xKSTV39ynfhXiRaBn_RBp1NZACJYBaT8'
-}
-conn.request("GET", "/calendars/3Y9CwpxIzqZgKUCXoyGc/free-slots?startDate=1756571400000&endDate=1757176200000&timezone=UTC", payload, headers)
-res = conn.getresponse()
-data = res.read()
-print(data.decode("utf-8"))
+# conn = http.client.HTTPSConnection("services.leadconnectorhq.com")
+# payload = ''
+# headers = {
+#   'Accept': 'application/json',
+#   'Version': '2021-04-15',
+#   'Authorization': 'Bearer '
+# }
+# conn.request("GET", "/calendars/3Y9CwpxIzqZgKUCXoyGc/free-slots?startDate=1756571400000&endDate=1757176200000&timezone=UTC", payload, headers)
+# res = conn.getresponse()
+# data = res.read()
+# print(data.decode("utf-8"))
+
+
+import kagglehub
+import pandas as pd
+import os
+
+# Download dataset
+path = kagglehub.dataset_download("dineshrustagi/sales-email-data")
+print("Path to dataset files:", path)
+
+# Find the CSV file inside the downloaded folder
+csv_path = None
+for file in os.listdir(path):
+    if file.endswith(".csv"):
+        csv_path = os.path.join(path, file)
+        print("Found CSV:", csv_path)
+        break
+
+if csv_path:
+    # Load dataset
+    df = pd.read_csv(csv_path)
+
+    # Save as Excel
+    excel_path = os.path.join(path, "sales_email_data.xlsx")
+    df.to_excel(excel_path, index=False)
+
+    print(f"Excel file saved at: {excel_path}")
+else:
+    print("No CSV file found in the dataset folder.")

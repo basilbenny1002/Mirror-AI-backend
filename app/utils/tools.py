@@ -55,7 +55,7 @@ def get_weather(city: str):
 
 import requests
 
-def add_or_update_contact(name: str, email: str, phone: str, booked: str, t: str, date: str):
+def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: str):
     """
     Add or update a contact in GoHighLevel with custom fields.
     If the contact with the same email or phone exists, overwrite its info.
@@ -102,7 +102,7 @@ def add_or_update_contact(name: str, email: str, phone: str, booked: str, t: str
     else:
         return {"status": "error", "code": response.status_code, "message": response.text}
     
-    
+
 def get_contact_info(contact_id: str):
     """
     Fetch a contact by ID and return name, email, phone,
