@@ -222,7 +222,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         if name or email or phone or booked or contact_id or date or t:
             print("Saving inactive session with contact details:", flush=True)
             print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Date: {date}, Time: {t}, Contact ID: {contact_id}", flush=True)
-            save_conversation(conversation, name, email, phone, booked, date, t, contact_id)
+            save_conversation(conversation, name, email, phone, booked, contact_id=contact_id, t=t, date=date)
         del sessions[sid]
 
     # Save conversation for current session if add_contact was called
@@ -251,7 +251,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         if name or email or phone or booked or contact_id or date or t:
             print("Saving current session with contact details:", flush=True)
             print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Date: {date}, Time: {t}, Contact ID: {contact_id}", flush=True)
-            save_conversation(conversation, name, email, phone, booked, date, t, contact_id)
+            save_conversation(conversation, name, email, phone, booked, contact_id=contact_id, t=t, date=date)
 
     if end:
         if session_id in sessions:
@@ -279,7 +279,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
             if name or email or phone or booked or contact_id or date or t:
                 print("Saving ending session with contact details:", flush=True)
                 print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Date: {date}, Time: {t}, Contact ID: {contact_id}", flush=True)
-            save_conversation(conversation, name, email, phone, booked, date, t, contact_id)
+            save_conversation(conversation, name, email, phone, booked, contact_id=contact_id, t=t, date=date)
             del sessions[session_id]
             return JSONResponse(status_code=200, content={"message": "Chat session ended and saved."})
         return JSONResponse(status_code=200, content={"message": "Chat session ended, no conversation found."})
@@ -443,7 +443,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         if name or email or phone or booked or contact_id or date or t:
             print("Saving post-message session with contact details:", flush=True)
             print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Date: {date}, Time: {t}, Contact ID: {contact_id}", flush=True)
-            save_conversation(conversation, name, email, phone, booked, date, t, contact_id)
+            save_conversation(conversation, name, email, phone, booked, contact_id, t, date )
 
     return JSONResponse(status_code=200, content={"message": response_message})
 

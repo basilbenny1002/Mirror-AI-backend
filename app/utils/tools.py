@@ -32,9 +32,9 @@ HEADERS = {
 }
 
 # Replace these with your actual custom field IDs
-BOOKED_FIELD_ID = "r9wLa2H8weqkXfIHgmLA"        # e.g. "Booked Call" field
-TIME_FIELD_ID = "Ogr5kUZzwCTtMXQxMf17"          # e.g. "Call Time" field
-DATE_FIELD_ID = "SMDVlM8yUR534vvOPkjn"          # e.g. "Call Date" field
+BOOKED_FIELD_ID = "59g21lZwv0U3YJBXtQcc"#"r9wLa2H8weqkXfIHgmLA"        # e.g. "Booked Call" field
+TIME_FIELD_ID = "B4x2SRqU3csMnTw6q8mo"#"Ogr5kUZzwCTtMXQxMf17"          # e.g. "Call Time" field
+DATE_FIELD_ID = "4V5u1RjpZ5Lna5QNLeZr"#"SMDVlM8yUR534vvOPkjn"          # e.g. "Call Date" field
 
 
 def to_unix(date_str: str) -> int:
@@ -103,57 +103,6 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
         return {"status": "error", "code": response.status_code, "message": response.text}
     
 
-def get_contact_info(contact_id: str):
-    """
-    Fetch a contact by ID and return name, email, phone,
-    and specific custom fields (booked, time, date).
-    """
-
-    url = f"{GHL_URL}/{contact_id}"
-    response = requests.get(url, headers=HEADERS)
-
-    if response.status_code != 200:
-        return {
-            "status": "error",
-            "code": response.status_code,
-            "message": response.text
-        }
-
-    data = response.json()
-
-    # Extract basic info
-    first_name = data.get("firstName", "")
-    last_name = data.get("lastName", "")
-    email = data.get("email", "")
-    phone = data.get("phone", "")
-
-    # Extract specific custom fields
-    custom_fields = data.get("customFields", [])
-    booked = None
-    time = None
-    date = None
-
-    for field in custom_fields:
-        if field.get("id") == "r9wLa2H8weqkXfIHgmLA":  # booked field
-            booked = field.get("value")
-        elif field.get("id") == "Ogr5kUZzwCTtMXQxMf17":  # time field
-            time = field.get("value")
-        elif field.get("id") == "SMDVlM8yUR534vvOPkjn":  # date field
-            date = field.get("value")
-
-    return {
-        "status": "success",
-        "data": {
-            "name": f"{first_name} {last_name}".strip(),
-            "email": email,
-            "phone": phone,
-            "booked": booked,
-            "time": time,
-            "date": date
-        }
-    }
-    
-
 def save_conversation(conversation, name=None, email=None, phone=None, booked=None, contact_id=None, t=None, date=None):
     """
     Find contact in GHL, then save conversation to MongoDB.
@@ -191,6 +140,7 @@ def save_conversation(conversation, name=None, email=None, phone=None, booked=No
             return
 
         contact_id = contacts[0]["id"]
+        print(f"Found contact_id, line 194, in tools.py: {contact_id}", flush=True)
 
         # Step 2: Upsert conversation (overwrite if exists)
         conversations_col.update_one(
@@ -257,3 +207,17 @@ def get_current_utc_datetime() -> dict:
 # print(get_current_utc_datetime())
 
 # print(get_available_time_slots("2025-08-31 10:00:00", "2025-09-06 10:00:00"))
+def get_contact_info(contact_id: str):
+    conn = http.client.HTTPSConnection("services.leadconnectorhq.com")
+    payload = ''
+    headers = {
+    'Accept': 'application/json',
+    'Version': '2021-07-28',
+    'Authorization': f'Bearer {API_KEY}'
+    }
+    conn.request("GET", f"/contacts/{contact_id}", payload, headers)
+    res = conn.getresponse()
+    data = res.read()
+    print(data.decode("utf-8"))
+
+get_contact_info("EvY019lK4vcvjzsNTp9F")

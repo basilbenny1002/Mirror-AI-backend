@@ -388,30 +388,30 @@
 # print(data.decode("utf-8"))
 
 
-import kagglehub
-import pandas as pd
-import os
+# import kagglehub
+# import pandas as pd
+# import os
 
-# Download dataset
-path = kagglehub.dataset_download("dineshrustagi/sales-email-data")
-print("Path to dataset files:", path)
+# # Download dataset
+# path = kagglehub.dataset_download("dineshrustagi/sales-email-data")
+# print("Path to dataset files:", path)
 
-# Find the CSV file inside the downloaded folder
-csv_path = None
-for file in os.listdir(path):
-    if file.endswith(".csv"):
-        csv_path = os.path.join(path, file)
-        print("Found CSV:", csv_path)
-        break
+# # Find the CSV file inside the downloaded folder
+# csv_path = None
+# for file in os.listdir(path):
+#     if file.endswith(".csv"):
+#         csv_path = os.path.join(path, file)
+#         print("Found CSV:", csv_path)
+#         break
 
-if csv_path:
-    # Load dataset
-    df = pd.read_csv(csv_path)
+# if csv_path:
+#     # Load dataset
+#     df = pd.read_csv(csv_path)
 
-    # Save as Excel
-    excel_path = os.path.join(path, "sales_email_data.xlsx")
-    df.to_excel(excel_path, index=False)
+#     # Save as Excel
+#     excel_path = os.path.join(path, "sales_email_data.xlsx")
+#     df.to_excel(excel_path, index=False)
 
-    print(f"Excel file saved at: {excel_path}")
-else:
-    print("No CSV file found in the dataset folder.")
+#     print(f"Excel file saved at: {excel_path}")
+# else:
+#     print("No CSV file found in the dataset folder.")
