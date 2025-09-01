@@ -38,6 +38,8 @@ DATE_FIELD_ID = "SMDVlM8yUR534vvOPkjn"          # e.g. "Call Date" field
 
 
 def to_unix(date_str: str) -> int:
+    if not date_str:
+        return ""
     """
     Convert a string in 'YYYY-MM-DD HH:MM:SS' format (UTC) to Unix timestamp (seconds).
     """
@@ -51,15 +53,28 @@ def get_weather(city: str):
     conditions = random.choice(["sunny", "cloudy", "rainy", "windy"])
     return f"The weather in {city} is {temp}°C and {conditions}."
 
-def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: str):
+import requests
+
+def add_or_update_contact(name: str, email: str, phone: str, booked: str, t: str, date: str):
     """
-    Add a contact to GoHighLevel with custom fields.
+    Add or update a contact in GoHighLevel with custom fields.
+    If the contact with the same email or phone exists, overwrite its info.
     """
 
     # Split name into first/last
     parts = name.strip().split(" ", 1)
     first_name = parts[0]
     last_name = parts[1] if len(parts) > 1 else ""
+
+    # Lookup contact by email or phone
+    lookup_url = f"{GHL_URL}/lookup"
+    params = {}
+    if email:
+        params["email"] = email
+    elif phone:
+        params["phone"] = phone
+
+    lookup_res = requests.get(lookup_url, headers=HEADERS, params=params)
 
     payload = {
         "firstName": first_name,
@@ -72,13 +87,71 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
             DATE_FIELD_ID: date
         }
     }
-    
-    response = requests.post(GHL_URL, headers=HEADERS, json=payload)
 
-    if response.status_code == 200:
+    if lookup_res.status_code == 200 and lookup_res.json().get("contact"):
+        # Contact exists → update
+        contact_id = lookup_res.json()["contact"]["id"]
+        update_url = f"{GHL_URL}/{contact_id}"
+        response = requests.put(update_url, headers=HEADERS, json=payload)
+    else:
+        # Contact doesn’t exist → create
+        response = requests.post(GHL_URL, headers=HEADERS, json=payload)
+
+    if response.status_code in (200, 201):
         return {"status": "success", "data": response.json()}
     else:
         return {"status": "error", "code": response.status_code, "message": response.text}
+    
+    
+def get_contact_info(contact_id: str):
+    """
+    Fetch a contact by ID and return name, email, phone,
+    and specific custom fields (booked, time, date).
+    """
+
+    url = f"{GHL_URL}/{contact_id}"
+    response = requests.get(url, headers=HEADERS)
+
+    if response.status_code != 200:
+        return {
+            "status": "error",
+            "code": response.status_code,
+            "message": response.text
+        }
+
+    data = response.json()
+
+    # Extract basic info
+    first_name = data.get("firstName", "")
+    last_name = data.get("lastName", "")
+    email = data.get("email", "")
+    phone = data.get("phone", "")
+
+    # Extract specific custom fields
+    custom_fields = data.get("customFields", [])
+    booked = None
+    time = None
+    date = None
+
+    for field in custom_fields:
+        if field.get("id") == "r9wLa2H8weqkXfIHgmLA":  # booked field
+            booked = field.get("value")
+        elif field.get("id") == "Ogr5kUZzwCTtMXQxMf17":  # time field
+            time = field.get("value")
+        elif field.get("id") == "SMDVlM8yUR534vvOPkjn":  # date field
+            date = field.get("value")
+
+    return {
+        "status": "success",
+        "data": {
+            "name": f"{first_name} {last_name}".strip(),
+            "email": email,
+            "phone": phone,
+            "booked": booked,
+            "time": time,
+            "date": date
+        }
+    }
     
 
 def save_conversation(conversation, name=None, email=None, phone=None, booked=None, contact_id=None, t=None, date=None):
