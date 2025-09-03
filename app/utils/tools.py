@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 from datetime import datetime
 import http.client
+from zoneinfo import ZoneInfo
 import json
 from datetime import datetime, timezone
 
@@ -60,6 +61,17 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
     Add or update a contact in GoHighLevel with custom fields.
     If the contact with the same email or phone exists, overwrite its info.
     """
+    dt_str = f"{booked} {t}"
+    
+    # Parse as UTC
+    dt_utc = datetime.strptime(dt_str, "%d-%b-%Y %I:%M %p").replace(tzinfo=ZoneInfo("UTC"))
+    
+    # Convert to PDT
+    dt_pdt = dt_utc.astimezone(ZoneInfo("America/Los_Angeles"))
+    
+    # Format back
+    new_date = dt_pdt.strftime("%d-%b-%Y").upper()   # e.g. "21-OCT-2021"
+    new_time = dt_pdt.strftime("%I:%M %p")   
 
     # Split name into first/last
     parts = name.strip().split(" ", 1)
@@ -83,8 +95,8 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
         "phone": phone,
         "customField": {
             BOOKED_FIELD_ID: booked,
-            TIME_FIELD_ID: t,
-            DATE_FIELD_ID: date
+            TIME_FIELD_ID: new_time,
+            DATE_FIELD_ID: new_date
         }
     }
 
