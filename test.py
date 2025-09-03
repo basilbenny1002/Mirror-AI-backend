@@ -416,5 +416,7 @@
 # else:
 #     print("No CSV file found in the dataset folder.")
 
-from app.utils.tools import add_contact
-add_contact(name="Test User", email="testuser@example.com", phone="+1234567890", booked="Yes", date="05-SEP-2025", t="03:30 PM")
+# from app.utils.tools import add_contact, get_available_time_slots
+# # add_contact(name="potatoooooooooo", email="meowwwwww@example.com", phone="+1222222", booked="Yes", date="04-SEP-2025", t="03:30 PM")
+
+# get_available_time_slots("2025-09-04 00:00:00", "2025-09-04 11:59:00")
