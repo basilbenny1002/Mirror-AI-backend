@@ -61,17 +61,25 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
     Add or update a contact in GoHighLevel with custom fields.
     If the contact with the same email or phone exists, overwrite its info.
     """
-    dt_str = f"{date} {t}"
-    
-    # Parse as UTC
-    dt_utc = datetime.strptime(dt_str, "%d-%b-%Y %I:%M %p").replace(tzinfo=ZoneInfo("UTC"))
-    
-    # Convert to PDT
-    dt_pdt = dt_utc.astimezone(ZoneInfo("America/Los_Angeles"))
-    
-    # Format back
-    new_date = dt_pdt.strftime("%d-%b-%Y").upper()   # e.g. "21-OCT-2021"
-    new_time = dt_pdt.strftime("%I:%M %p")   
+    try:
+        dt_str = f"{date} {t}"
+        
+        # Parse as UTC
+        dt_utc = datetime.strptime(dt_str, "%d-%b-%Y %I:%M %p").replace(tzinfo=ZoneInfo("UTC"))
+        
+        # Convert to PDT
+        dt_pdt = dt_utc.astimezone(ZoneInfo("America/Los_Angeles"))
+        
+        # Format back
+        new_date = dt_pdt.strftime("%d-%b-%Y").upper()   # e.g. "21-OCT-2021"
+        new_time = dt_pdt.strftime("%I:%M %p")   
+    except Exception as e:
+        print(f"Error processing date/time: {e}", flush=True)
+        new_date = "cancelled"
+        new_time = "cancelled"
+        print(f"{t}, {date}", flush=True)
+    else:
+        pass
 
 
     # Split name into first/last

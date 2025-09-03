@@ -83,7 +83,7 @@ add_contact_tool = {
     "type": "function",
     "function": {
         "name": "add_contact",
-        "description": "Add a new contact to GoHighLevel CRM with custom fields for booking status, date, and time.",
+        "description": "Add a new contact to GoHighLevel CRM with custom fields for booking status, date, and time. If the date and time are a string named cancelled, this is used to cancel the appointment booking. If new values for date and time are passed with the same name, email, and phone, then the booking date and time will be updated.",
         "parameters": {
             "type": "object",
             "properties": {
