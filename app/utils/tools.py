@@ -45,7 +45,7 @@ def to_unix(date_str: str) -> int:
     """
     dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
     # Treat it as UTC
-    return int(dt.replace(tzinfo=timezone.utc).timestamp())
+    return int(dt.replace(tzinfo=timezone.utc).timestamp()) * 1000
 
 def get_weather(city: str):
     """Generate random weather conditions for a given city."""
@@ -174,8 +174,9 @@ def get_available_time_slots(start_date: str, end_date: str) -> dict:
         dict: Response with status, and either time slots (on success) or error info.
     """
     GHL_TOKEN = os.getenv("GHL_API_KEY")
-    s = to_unix(start_date)
-    e = to_unix(end_date)
+    s = str(to_unix(start_date))
+    e = str(to_unix(end_date))
+    print(s + " ", e, flush=True)
     conn = http.client.HTTPSConnection("services.leadconnectorhq.com")
     payload = ''
     headers = {
@@ -183,15 +184,15 @@ def get_available_time_slots(start_date: str, end_date: str) -> dict:
     'Version': '2021-04-15',
     'Authorization': 'Bearer ' + GHL_TOKEN
     }
-    conn.request("GET", "/calendars/3Y9CwpxIzqZgKUCXoyGc/free-slots?startDate=1756571400000&endDate=1757176200000&timezone=UTC", payload, headers)
+    conn.request("GET", f"/calendars/3Y9CwpxIzqZgKUCXoyGc/free-slots?startDate={s}&endDate={e}&timezone=UTC", payload, headers)
     res = conn.getresponse()
     data = res.read()
-    # print(data.decode("utf-8"))
+    print(data.decode("utf-8"), flush=True)
     if res.status == 200:
         return {"status": "success", "data": str(data.decode("utf-8"))}
     else:
         return {"status": "error", "code": res.status, "message": str(data.decode("utf-8"))}
-
+    
 
 def get_current_utc_datetime() -> dict:
     """
@@ -220,4 +221,5 @@ def get_contact_info(contact_id: str):
     data = res.read()
     print(data.decode("utf-8"))
 
-get_contact_info("EvY019lK4vcvjzsNTp9F")
+# get_contact_info("EvY019lK4vcvjzsNTp9F")
+# get_available_time_slots("2025-09-10 00:00:00", "2025-09-10 11:59:00")
