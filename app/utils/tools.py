@@ -1,12 +1,12 @@
 import random
 # from database.insights_db import save_insight, search_insight
+from zoneinfo import ZoneInfo
 import os
 import requests
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from datetime import datetime
 import http.client
-from zoneinfo import ZoneInfo
 import json
 from datetime import datetime, timezone
 
@@ -33,9 +33,9 @@ HEADERS = {
 }
 
 # Replace these with your actual custom field IDs
-BOOKED_FIELD_ID = "59g21lZwv0U3YJBXtQcc"#"r9wLa2H8weqkXfIHgmLA"        # e.g. "Booked Call" field
-TIME_FIELD_ID = "B4x2SRqU3csMnTw6q8mo"#"Ogr5kUZzwCTtMXQxMf17"          # e.g. "Call Time" field
-DATE_FIELD_ID = "4V5u1RjpZ5Lna5QNLeZr"#"SMDVlM8yUR534vvOPkjn"          # e.g. "Call Date" field
+BOOKED_FIELD_ID = "r9wLa2H8weqkXfIHgmLA"#"r9wLa2H8weqkXfIHgmLA" 59g21lZwv0U3YJBXtQcc       # e.g. "Booked Call" field
+TIME_FIELD_ID = "Ogr5kUZzwCTtMXQxMf17"#"Ogr5kUZzwCTtMXQxMf17"   B4x2SRqU3csMnTw6q8mo       # e.g. "Call Time" field
+DATE_FIELD_ID = "SMDVlM8yUR534vvOPkjn"#"SMDVlM8yUR534vvOPkjn"    "4V5u1RjpZ5Lna5QNLeZr"      # e.g. "Call Date" field
 
 
 def to_unix(date_str: str) -> int:
@@ -61,7 +61,7 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
     Add or update a contact in GoHighLevel with custom fields.
     If the contact with the same email or phone exists, overwrite its info.
     """
-    dt_str = f"{booked} {t}"
+    dt_str = f"{date} {t}"
     
     # Parse as UTC
     dt_utc = datetime.strptime(dt_str, "%d-%b-%Y %I:%M %p").replace(tzinfo=ZoneInfo("UTC"))
@@ -72,6 +72,7 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
     # Format back
     new_date = dt_pdt.strftime("%d-%b-%Y").upper()   # e.g. "21-OCT-2021"
     new_time = dt_pdt.strftime("%I:%M %p")   
+
 
     # Split name into first/last
     parts = name.strip().split(" ", 1)

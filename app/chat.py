@@ -18,7 +18,7 @@ if not api_key:
 client = OpenAI(api_key=api_key)
 
 # Extract text from the PDF file
-pdf_path = "LeadifySolutions_Info_FULL.pdf"
+pdf_path = "Wallace Energy combined pdf.pdf"
 if not os.path.exists(pdf_path):
     raise FileNotFoundError(f"PDF file not found at {pdf_path}")
 
@@ -37,12 +37,11 @@ except Exception as e:
 
 # System instructions
 
-company_name = "Leadify"
-company_specialization = "lead generation"
+company_name = "Wallace Energy"
+company_specialization = "EV Charger installation"
 company_documentation = pdf_text 
 additional_info = """
-Leadify specializes in scraping Twitch to identify high-potential leads, such as streamers and content creators, and filtering them based on criteria like viewer count, engagement rates, content categories, or custom brand requirements. This enables brands to efficiently connect with a large number of creators for sponsorships, influencer partnerships, marketing campaigns, or community growth. For example, if a brand needs gaming influencers with 1,000+ average viewers for a campaign, Leadify’s process identifies, filters, and streamlines outreach to maximize ROI. Benefits include time savings, precise targeting, and scalable outreach, allowing brands to build impactful partnerships quickly.
-"""
+Question: What if there aren’t enough EVs in my area yet?//nAnswer: EV adoption is growing rapidly, and installing chargers now positions your business ahead of the curve. Customers will view your location as forward-thinking and EV-friendly, which can attract new visitors before competitors catch up.//n//nQuestion: Isn't it too expensive to install?//nAnswer: While there is an upfront cost, there are federal, state, and utility incentives that can significantly reduce installation costs. Additionally, charging stations can generate revenue, increase foot traffic, and boost property value—turning the expense into an investment.//n//nQuestion: What if people don’t use it?//nAnswer: Most EV drivers plan their routes around charging availability. By providing a station, you not only meet a growing need but also attract drivers who will shop, dine, or spend time at your location while charging.//n//nQuestion: What about the hassle of managing it?//nAnswer: Many solutions include turnkey management—handling payments, software, and maintenance—so you can stay focused on your business while the charger operates smoothly.//n//nQuestion: What if I don't have the electrical capacity for it?//nAnswer: Part of our evaluation includes reviewing your existing electrical infrastructure. In many cases, upgrades are minor, and in others, phased solutions or load management systems can allow you to start with minimal changes.//n//nQuestion: How can I be sure it will provide a return on investment?//nAnswer: Beyond direct revenue from charging, stations increase dwell time, attract new customers, and enhance brand image. Properties with EV chargers also rent or sell faster at higher values.//n//nQuestion: Isn't maintenance a headache?//nAnswer: Modern charging stations are designed to be low-maintenance. We offer service agreements and monitoring so any issues can be quickly resolved, keeping downtime minimal.//n//nQuestion: What if technology changes and my station becomes outdated?//nAnswer: Charging technology is designed with scalability in mind. Many stations can be updated with new software or modular hardware upgrades, protecting your investment long-term.//n//nQuestion: What if I don't have room in my parking lot?//nAnswer: Chargers can be installed in just one or two existing parking spaces. They don’t require a lot of space, and signage can help designate them for EV use.//n//nQuestion: What if my customers don’t drive EVs?//nAnswer: Even if your current customers don’t, new ones will. Offering charging stations can attract a different demographic—EV drivers tend to have higher household incomes and actively seek out businesses with charging availability."""
 placeholders = {
     "_COMPANY_NAME_": company_name,
     "_COMPANY_SPECIALIZATION_": company_specialization,

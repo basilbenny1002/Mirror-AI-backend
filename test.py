@@ -416,3 +416,5 @@
 # else:
 #     print("No CSV file found in the dataset folder.")
 
+from app.utils.tools import add_contact
+add_contact(name="Test User", email="testuser@example.com", phone="+1234567890", booked="Yes", date="05-SEP-2025", t="03:30 PM")
