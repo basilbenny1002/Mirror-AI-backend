@@ -307,7 +307,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         stream_response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=sessions[session_id]["messages"],
-            tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
+            tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
             tool_choice="auto",
             stream=True
         )
@@ -401,6 +401,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
 
     # Define the generator for streaming
     def generate():
+        nonlocal content
         full_content = ""
         if finish_reason == "tool_calls":
             # Submit tool outputs and stream final response
@@ -408,7 +409,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                 stream_response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=sessions[session_id]["messages"],
-                    tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
+                    tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                     tool_choice="auto",
                     stream=True
                 )
@@ -416,17 +417,17 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                     if chunk.choices[0].delta.content is not None:
                         delta = chunk.choices[0].delta.content
                         full_content += delta
-                        yield f"data: {delta}\n\n"
+                        yield f"data: {json.dumps({'message': delta})}\n\n"
             except Exception as e:
-                yield f"data: [ERROR] {str(e)}\n\n"
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 return
         else:
-            # Fake stream the buffered content by words
-            words = content.split()
-            for i, word in enumerate(words):
-                delta = word + (" " if i < len(words) - 1 else "")
+            # Stream the buffered content in chunks, preserving all whitespace
+            chunk_size = 10  # Adjust chunk size for smooth streaming
+            for i in range(0, len(content), chunk_size):
+                delta = content[i:i + chunk_size]
                 full_content += delta
-                yield f"data: {delta}\n\n"
+                yield f"data: {json.dumps({'message': delta})}\n\n"
 
         # Append final assistant response to session history
         sessions[session_id]["messages"].append({
@@ -462,10 +463,9 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
             if name or email or phone or booked or contact_id or date or t:
                 print("Saving post-message session with contact details:", flush=True)
                 print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Date: {date}, Time: {t}, Contact ID: {contact_id}", flush=True)
-                save_conversation(conversation, name, email, phone, booked, contact_id=contact_id, t=t, date=date )
+                save_conversation(conversation, name, email, phone, booked, contact_id=contact_id, t=t, date=date)
 
     return StreamingResponse(generate(), media_type="text/event-stream")
-
 
 
 def resume_chat_session(contactID: str, user_input: str, followup_stage: str = ""):
