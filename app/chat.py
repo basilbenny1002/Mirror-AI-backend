@@ -417,17 +417,18 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                     if chunk.choices[0].delta.content is not None:
                         delta = chunk.choices[0].delta.content
                         full_content += delta
-                        yield f"data: {json.dumps({'message': delta})}\n\n"
+                        yield f"data: {delta}\n\n"
             except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                yield f"data: [ERROR] {str(e)}\n\n"
                 return
         else:
-            # Stream the buffered content in chunks, preserving all whitespace
-            chunk_size = 10  # Adjust chunk size for smooth streaming
-            for i in range(0, len(content), chunk_size):
-                delta = content[i:i + chunk_size]
-                full_content += delta
-                yield f"data: {json.dumps({'message': delta})}\n\n"
+            # Split content into words and whitespace for streaming
+            import re
+            chunks = re.split(r'(\s+)', content)  # Split on whitespace, preserving it
+            for chunk in chunks:
+                if chunk:  # Skip empty chunks
+                    full_content += chunk
+                    yield f"data: {chunk}\n\n"
 
         # Append final assistant response to session history
         sessions[session_id]["messages"].append({
