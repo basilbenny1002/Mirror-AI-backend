@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 import PyPDF2
 from app.utils.tools import get_weather, add_contact, get_conversation, save_conversation, get_available_time_slots, get_current_utc_datetime
 from pathlib import Path
+from fastapi.responses import StreamingResponse
+
 # Load environment variables
 load_dotenv()
 api_key = os.getenv("OPEN_AI_API_KEY")
@@ -300,151 +302,170 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         "content": user_input
     })
 
-    # Prepare the API request
+    # Prepare the API request with streaming for buffering
     try:
-        response = client.chat.completions.create(
+        stream_response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=sessions[session_id]["messages"],
             tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
-            tool_choice="auto"
+            tool_choice="auto",
+            stream=True
         )
+
+        content = ""
+        tool_call_deltas = {}
+        finish_reason = None
+
+        for chunk in stream_response:
+            if chunk.choices and chunk.choices[0]:
+                delta = chunk.choices[0].delta
+                if delta.content is not None:
+                    content += delta.content
+                if delta.tool_calls:
+                    for tc_delta in delta.tool_calls:
+                        index = tc_delta.index
+                        if index not in tool_call_deltas:
+                            tool_call_deltas[index] = {"id": "", "type": "function", "function": {"name": "", "arguments": ""}}
+                        if tc_delta.id:
+                            tool_call_deltas[index]["id"] += tc_delta.id
+                        if tc_delta.function.name:
+                            tool_call_deltas[index]["function"]["name"] += tc_delta.function.name
+                        if tc_delta.function.arguments:
+                            tool_call_deltas[index]["function"]["arguments"] += tc_delta.function.arguments
+                if chunk.choices[0].finish_reason is not None:
+                    finish_reason = chunk.choices[0].finish_reason
+
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Error calling chat completion: {str(e)}"})
 
-    # Process the response
-    choice = response.choices[0]
-    if choice.finish_reason == "tool_calls":
-        tool_calls = choice.message.tool_calls
-        print("Tool calls received:", [tool_call.function.name for tool_call in tool_calls], flush=True)
-        tool_messages = []
-        # Append the assistant's message *with* tool_calls to the session history
+    # Process the buffered response
+    if finish_reason == "tool_calls":
+        tool_calls = list(tool_call_deltas.values)
+        print("Tool calls received:", [tc["function"]["name"] for tc in tool_calls], flush=True)
         sessions[session_id]["messages"].append({
             "role": "assistant",
-            "content": choice.message.content or "",
+            "content": content or "",
             "tool_calls": [
                 {
-                    "id": tool_call.id,
-                    "type": tool_call.type,
+                    "id": tc["id"],
+                    "type": tc["type"],
                     "function": {
-                        "name": tool_call.function.name,
-                        "arguments": tool_call.function.arguments
+                        "name": tc["function"]["name"],
+                        "arguments": tc["function"]["arguments"]
                     }
-                } for tool_call in tool_calls
+                } for tc in tool_calls
             ]
         })
 
+        tool_messages = []
         for tool_call in tool_calls:
-            if tool_call.type == "function" and tool_call.function.name == "get_weather":
-                try:
-                    args = json.loads(tool_call.function.arguments)
+            function_name = tool_call["function"]["name"]
+            try:
+                args = json.loads(tool_call["function"]["arguments"])
+                if function_name == "get_weather":
                     result = get_weather(args["city"])
-                    tool_messages.append({
-                        "role": "tool",
-                        "content": result,
-                        "tool_call_id": tool_call.id
-                    })
-                except Exception as e:
-                    return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
-            elif tool_call.type == "function" and tool_call.function.name == "add_contact":
-                args = json.loads(tool_call.function.arguments)
-                print("Add contact called with args:", args, flush=True)
-                result = add_contact(
-                    name=args["name"],
-                    email=args["email"],
-                    phone=args["phone"],
-                    booked=args["booked"],
-                    date=args["date"],
-                    t=args["time"]
-                )
-                print("Add contact result:", result, flush=True)
-                tool_messages.append({
-                    "role": "tool",
-                    "content": json.dumps(result),
-                    "tool_call_id": tool_call.id
-                })
-            elif tool_call.type == "function" and tool_call.function.name == "get_available_time_slots":
-                try:
-                    args = json.loads(tool_call.function.arguments)
+                elif function_name == "add_contact":
+                    print("Add contact called with args:", args, flush=True)
+                    result = add_contact(
+                        name=args["name"],
+                        email=args["email"],
+                        phone=args["phone"],
+                        booked=args["booked"],
+                        date=args["date"],
+                        t=args["time"]
+                    )
+                    print("Add contact result:", result, flush=True)
+                    result = json.dumps(result)
+                elif function_name == "get_available_time_slots":
                     print("Get available time slots called with args:", args, flush=True)
                     result = get_available_time_slots(args["start_date"], args["end_date"])
                     print("Get available time slots result:", result, flush=True)
-                    tool_messages.append({
-                        "role": "tool",
-                        "content": json.dumps(result),
-                        "tool_call_id": tool_call.id
-                    })
-                except Exception as e:
-                    return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
-            elif tool_call.type == "function" and tool_call.function.name == "get_current_utc_datetime":
-                try:
-                    json.loads(tool_call.function.arguments)
+                    result = json.dumps(result)
+                elif function_name == "get_current_utc_datetime":
                     print("Get current UTC datetime called", flush=True)
                     result = get_current_utc_datetime()
                     print("Get current UTC datetime result:", result, flush=True)
-                    tool_messages.append({
-                        "role": "tool",
-                        "content": json.dumps(result),
-                        "tool_call_id": tool_call.id
-                    })
-                except Exception as e:
-                    return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
+                    result = json.dumps(result)
+                tool_messages.append({
+                    "role": "tool",
+                    "content": result,
+                    "tool_call_id": tool_call["id"]
+                })
+            except Exception as e:
+                return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
+
         print("Tool messages to append:", tool_messages, flush=True)
 
         # Append tool messages to history
         sessions[session_id]["messages"].extend(tool_messages)
 
-        # Submit tool outputs and get final response
-        try:
-            final_response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=sessions[session_id]["messages"],
-                tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
-                tool_choice="auto"
-            )
-            response_message = final_response.choices[0].message.content
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"error": f" in line 414{str(e)}"})
+    # Define the generator for streaming
+    def generate():
+        full_content = ""
+        if finish_reason == "tool_calls":
+            # Submit tool outputs and stream final response
+            try:
+                stream_response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=sessions[session_id]["messages"],
+                    tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
+                    tool_choice="auto",
+                    stream=True
+                )
+                for chunk in stream_response:
+                    if chunk.choices[0].delta.content is not None:
+                        delta = chunk.choices[0].delta.content
+                        full_content += delta
+                        yield f"data: {delta}\n\n"
+            except Exception as e:
+                yield f"data: [ERROR] {str(e)}\n\n"
+                return
+        else:
+            # Fake stream the buffered content by words
+            words = content.split()
+            for i, word in enumerate(words):
+                delta = word + (" " if i < len(words) - 1 else "")
+                full_content += delta
+                yield f"data: {delta}\n\n"
 
-    else:
-        response_message = choice.message.content
+        # Append final assistant response to session history
+        sessions[session_id]["messages"].append({
+            "role": "assistant",
+            "content": full_content
+        })
 
-    # Append final assistant response to session history
-    sessions[session_id]["messages"].append({
-        "role": "assistant",
-        "content": response_message
-    })
+        # Update last activity timestamp after successful response
+        sessions[session_id]["last_activity"] = time.time()
 
-    # Update last activity timestamp after successful response
-    sessions[session_id]["last_activity"] = time.time()
+        # Save conversation again after new message if add_contact was called
+        if session_id in sessions:
+            conversation = convert_messages_to_string(sessions[session_id]["messages"])
+            name, email, phone, booked, contact_id, date, t = None, None, None, None, None, None, None
+            for i, msg in enumerate(sessions[session_id]["messages"]):
+                if msg["role"] == "tool" and "tool_call_id" in msg:
+                    if i > 0 and sessions[session_id]["messages"][i-1]["role"] == "assistant" and "tool_calls" in sessions[session_id]["messages"][i-1]:
+                        for tool_call in sessions[session_id]["messages"][i-1]["tool_calls"]:
+                            if tool_call["function"]["name"] == "add_contact":
+                                try:
+                                    result = json.loads(msg["content"])
+                                    print("Extracted add_contact result for post-message save:", result, flush=True)
+                                    contact = result.get("data", {}).get("contact", {})
+                                    name = contact.get("fullNameLowerCase")
+                                    email = contact.get("email")
+                                    phone = contact.get("phone")
+                                    booked = contact.get("customField", [{}])[0].get("fieldValue")
+                                    date = contact.get("customField", [{}])[1].get("fieldValue")
+                                    t = contact.get("customField", [{}])[2].get("fieldValue")
+                                    contact_id = contact.get("id")
+                                except json.JSONDecodeError as e:
+                                    print("JSON decode error in post-message add_contact parsing:", str(e), flush=True)
+            if name or email or phone or booked or contact_id or date or t:
+                print("Saving post-message session with contact details:", flush=True)
+                print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Date: {date}, Time: {t}, Contact ID: {contact_id}", flush=True)
+                save_conversation(conversation, name, email, phone, booked, contact_id=contact_id, t=t, date=date )
 
-    # Save conversation again after new message if add_contact was called
-    if session_id in sessions:
-        conversation = convert_messages_to_string(sessions[session_id]["messages"])
-        name, email, phone, booked, contact_id, date, t = None, None, None, None, None, None, None
-        for i, msg in enumerate(sessions[session_id]["messages"]):
-            if msg["role"] == "tool" and "tool_call_id" in msg:
-                if i > 0 and sessions[session_id]["messages"][i-1]["role"] == "assistant" and "tool_calls" in sessions[session_id]["messages"][i-1]:
-                    for tool_call in sessions[session_id]["messages"][i-1]["tool_calls"]:
-                        if tool_call["function"]["name"] == "add_contact":
-                            try:
-                                result = json.loads(msg["content"])
-                                print("Extracted add_contact result for post-message save:", result, flush=True)
-                                contact = result.get("data", {}).get("contact", {})
-                                name = contact.get("fullNameLowerCase")
-                                email = contact.get("email")
-                                phone = contact.get("phone")
-                                booked = contact.get("customField", [{}])[0].get("fieldValue")
-                                date = contact.get("customField", [{}])[1].get("fieldValue")
-                                t = contact.get("customField", [{}])[2].get("fieldValue")
-                                contact_id = contact.get("id")
-                            except json.JSONDecodeError as e:
-                                print("JSON decode error in post-message add_contact parsing:", str(e), flush=True)
-        if name or email or phone or booked or contact_id or date or t:
-            print("Saving post-message session with contact details:", flush=True)
-            print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Date: {date}, Time: {t}, Contact ID: {contact_id}", flush=True)
-            save_conversation(conversation, name, email, phone, booked, contact_id, t, date )
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
-    return JSONResponse(status_code=200, content={"message": response_message})
 
 
 def resume_chat_session(contactID: str, user_input: str, followup_stage: str = ""):

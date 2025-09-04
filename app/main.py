@@ -31,11 +31,12 @@ def root():
 
 
 @app.post("/chat")
-def chat(data: ChatRequest):
+async def chat(data: ChatRequest):
     try:
-        return chat_session(data.sessionID, data.message, data.end if data.end else None )
+        response = chat_session(data.sessionID, data.message, data.end if data.end else False)
+        return response
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error":f"main error aaaaaa {str(e)}"})
+        return JSONResponse(status_code=500, content={"error": f"main error: {str(e)}"})
     
 @app.post("/resume_chat")
 def resume_chat(data: ResumeChat):
