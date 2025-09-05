@@ -135,7 +135,8 @@ get_available_time_slots_tool = {
                 "start_date": {
                     "type": "string",
                     "description": (
-                        "Start date in 'YYYY-MM-DD HH:MM:SS' format (UTC). "
+                        "Start date in UTC. Preferred format: 'YYYY-MM-DD HH:MM:SS'. "
+                        "Also accepts ISO 8601 with Z suffix, e.g. '2025-09-05T00:00:00Z'. "
                         "If the user specifies 'today' or 'same day', "
                         "set this to 'YYYY-MM-DD 00:00:00'."
                     ),
@@ -143,7 +144,8 @@ get_available_time_slots_tool = {
                 "end_date": {
                     "type": "string",
                     "description": (
-                        "End date in 'YYYY-MM-DD HH:MM:SS' format (UTC). "
+                        "End date in UTC. Preferred format: 'YYYY-MM-DD HH:MM:SS'. "
+                        "Also accepts ISO 8601 with Z suffix, e.g. '2025-09-05T23:59:59Z'. "
                         "If the user specifies 'today' or 'same day', "
                         "set this to 'YYYY-MM-DD 23:59:59'."
                     ),
@@ -153,6 +155,7 @@ get_available_time_slots_tool = {
         },
     },
 }
+
 
 
 
@@ -303,7 +306,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     # Prepare the API request
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o-mini", #"o1"
             messages=sessions[session_id]["messages"],
             tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
             tool_choice="auto"

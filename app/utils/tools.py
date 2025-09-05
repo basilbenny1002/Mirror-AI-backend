@@ -9,6 +9,7 @@ from datetime import datetime
 import http.client
 import json
 from datetime import datetime, timezone
+import requests
 
 
 # Load environment variables
@@ -48,13 +49,35 @@ def to_unix(date_str: str) -> int:
     # Treat it as UTC
     return int(dt.replace(tzinfo=timezone.utc).timestamp()) * 1000
 
+# def to_unix(date_str: str) -> int:
+#     """
+#     Convert a UTC date string to a Unix timestamp in milliseconds.
+#     Accepts:
+#       - 'YYYY-MM-DD HH:MM:SS'
+#       - 'YYYY-MM-DDTHH:MM:SSZ'
+#     """
+#     if not date_str:
+#         return ""
+
+#     try:
+#         # Case 1: "YYYY-MM-DD HH:MM:SS"
+#         dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+#     except ValueError:
+#         try:
+#             # Case 2: "YYYY-MM-DDTHH:MM:SSZ"
+#             dt = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ")
+#         except ValueError as e:
+#             raise ValueError(f"Unsupported date format: {date_str}") from e
+
+#     return int(dt.replace(tzinfo=timezone.utc).timestamp()) * 1000
+
 def get_weather(city: str):
     """Generate random weather conditions for a given city."""
     temp = random.randint(10, 40)
     conditions = random.choice(["sunny", "cloudy", "rainy", "windy"])
     return f"The weather in {city} is {temp}°C and {conditions}."
 
-import requests
+
 
 def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: str):
     """
@@ -66,18 +89,65 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
         
         # Parse as UTC
         dt_utc = datetime.strptime(dt_str, "%d-%b-%Y %I:%M %p").replace(tzinfo=ZoneInfo("UTC"))
-        
+        iso_str = dt_utc.strftime("%Y-%m-%dT%H:%M:%SZ")  # format to compare with slots
+
+        # Build start and end of the same date (in UTC format)
+        day = dt_utc.strftime("%Y-%m-%d")
+        start = f"{day} 00:00:00"
+        end = f"{day} 23:59:59"
+        print(f"Checking availability for {iso_str} between {start} and {end}", flush=True)
+        # Get available slots for that date
+        available = get_available_time_slots(start, end)
+        print("\nAvailable slots response:\n", flush=True)
+        print(available, flush=True)
+        # slots = available.get("data", {}).get(str(day), {}).get("slots", [])
+        data_str = available.get("data", "{}")
+        data_dict = json.loads(data_str)
+        slots = data_dict.get(str(day), {}).get("slots", [])
+
+        # Check availability
+        if iso_str not in slots:
+            print("\nIso string response:\n", flush=True)
+            print(iso_str, "  ", slots, flush=True)
+            # Create a "dummy" contact structure to prevent the calling function from crashing.
+            # The 'message' will be passed to the next AI call to inform the user.
+            # The key is providing a customField list with 3 elements to avoid the index error.
+            error_payload = {
+                "status": "error",
+                "message": f"Sorry, the slot {date} {t} has already been taken.",
+                "data": {
+                    "contact": {
+                        "customField": [{}, {}, {}] # This safely fills the list
+                    }
+                }
+            }
+            print(f"Slot {date} {t} not available.", flush=True)
+            return error_payload
         # Convert to PDT
-        dt_pdt = dt_utc.astimezone(ZoneInfo("America/Los_Angeles"))
+        print("\nDate and time before timezone conversion:\n", flush=True)
+        print(date, " ", t, "\n", flush=True)
+        dt_pdt = dt_utc.astimezone(ZoneInfo("America/New_York"))
         
         # Format back
         new_date = dt_pdt.strftime("%d-%b-%Y").upper()   # e.g. "21-OCT-2021"
         new_time = dt_pdt.strftime("%I:%M %p")   
+        print("\nDate and time after timezone conversion:\n", flush=True)
+        print(new_date, " ", new_time, "\n", flush=True)
     except Exception as e:
         print(f"Error processing date/time: {e}", flush=True)
         new_date = "cancelled"
         new_time = "cancelled"
+        error_payload = {
+                "status": "error",
+                "message": f"Sorry an exception occurred: {str(e)}",
+                "data": {
+                    "contact": {
+                        "customField": [{}, {}, {}] # This safely fills the list
+                    }
+                }
+            }
         print(f"{t}, {date}", flush=True)
+        return error_payload
     else:
         pass
 
@@ -205,7 +275,7 @@ def get_available_time_slots(start_date: str, end_date: str) -> dict:
     'Version': '2021-04-15',
     'Authorization': 'Bearer ' + GHL_TOKEN
     }
-    conn.request("GET", f"/calendars/3Y9CwpxIzqZgKUCXoyGc/free-slots?startDate={s}&endDate={e}&timezone=UTC", payload, headers)
+    conn.request("GET", f"/calendars/JzIjRCGcT0ub3anLQjai/free-slots?startDate={s}&endDate={e}&timezone=UTC", payload, headers)
     res = conn.getresponse()
     data = res.read()
     print(data.decode("utf-8"), flush=True)
@@ -243,4 +313,6 @@ def get_contact_info(contact_id: str):
     print(data.decode("utf-8"))
 
 # get_contact_info("EvY019lK4vcvjzsNTp9F")
-# get_available_time_slots("2025-09-10 00:00:00", "2025-09-10 11:59:00")
+# get_available_time_slots("2025-09-10 00:00:00", "2025-09-10 23:59:00")
+# resp = get_available_time_slots("2025-09-10T00:00:00Z", "2025-09-10T23:59:59Z")
+get_available_time_slots("2025-09-10 00:00:00","2025-09-10 23:59:59" )
