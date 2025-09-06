@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from app.chat import chat_session, resume_chat_session
+from app.chat import chat_session, resume_chat_session, add_ai_message
 from typing import Optional
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +23,9 @@ class ResumeChat(BaseModel):
     id: str
     reply: Optional[str] = None
     followup_stage: str
+class ChatMessage(BaseModel):
+    id: str
+    content: str
 
 
 @app.get("/")
@@ -41,5 +44,11 @@ def chat(data: ChatRequest):
 def resume_chat(data: ResumeChat):
     try:
         return resume_chat_session(contactID=data.id, user_input=data.reply, followup_stage=data.followup_stage)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+@app.post("/add_ai_message")
+def add_ai_message_endpoint(data: ResumeChat):
+    try:
+        return add_ai_message(contact_id=data.id, ai_message=data.reply)
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})

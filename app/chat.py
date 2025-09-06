@@ -695,6 +695,6 @@ def add_ai_message(contact_id: str, ai_message: str):
     # Save the updated conversation
     try:
         save_conversation(conversation=updated_conversation, contact_id=contact_id)
-        return {"status": "success", "message": "AI message added to conversation history"}
+        return  JSONResponse(status_code=200, content={"status": "success", "message": "AI message added to conversation history"})
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
