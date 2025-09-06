@@ -9,7 +9,7 @@ import PyPDF2
 from app.utils.tools import get_weather, add_contact, get_conversation, save_conversation, get_available_time_slots, get_current_utc_datetime
 from pathlib import Path
 from app.utils.tools import replace_dynamic_variables
-from app.main import ResumeChat
+# from app.main import ResumeChat
 # Load environment variables
 load_dotenv()
 api_key = os.getenv("OPEN_AI_API_KEY")
@@ -451,7 +451,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     return JSONResponse(status_code=200, content={"message": response_message})
 
 
-def resume_chat_session(contactID: str, user_input: str,user: ResumeChat, followup_stage: str = "", ):
+def resume_chat_session(contactID: str, user_input: str,user, followup_stage: str = "", ):
     """Resume or start a chat session from a conversation string, continue with new user input, and return updated conversation string.
    
     Args:
