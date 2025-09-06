@@ -483,211 +483,172 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
     """
     welcome_message = final_instructions
     if followup_stage:
-        instruction_template = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
-        print(f"Followup stage {followup_stage} instructions: {instruction_template}", flush=True)
-        instructions = replace_dynamic_variables(instruction_template, user)
-    # Initialize local messages list
-    messages = []
-    conversation = get_conversation(contact_id)
-    # Parse conversation string into messages if provided
-    if conversation:
-        blocks = conversation.split("---\n")
-        for block in blocks:
-            if not block.strip():
-                continue
-            lines = block.split("\n")
-            msg = {}
-            content_lines = []
-            for line in lines:
-                if line.startswith("Role: "):
-                    msg["role"] = line.replace("Role: ", "").strip()
-                elif line.startswith("Content:\n"):
-                    content_lines.append(line.replace("Content:\n", "").strip())
-                elif line.startswith("ToolCalls: "):
-                    msg["tool_calls"] = json.loads(line.replace("ToolCalls: ", "").strip())
-                elif line.startswith("ToolCallID: "):
-                    msg["tool_call_id"] = line.replace("ToolCallID: ", "").strip()
-                elif content_lines:
-                    content_lines.append(line.strip())
-            if content_lines:
-                msg["content"] = "\n".join(content_lines)
-            if msg.get("role"):
-                messages.append(msg)
-    else:
-        # Start new session with welcome message and stage 0 instructions
-        messages.append({"role": "system", "content": welcome_message})
-        instructions = os.getenv(f"FOLLOWUP_STAGE_0")
-        messages.append({"role": "system", "content": instructions})
-       
-        # For stage 0 (no conversation), process instructions and return response
+        welcome_message = final_instructions
+        messages = []
+        conversation = get_conversation(contact_id)
+        print("Retrieved conversation:", conversation, flush=True)
+
+        # Parse conversation string into messages if provided
+        if conversation:
+            blocks = conversation.split("---\n")
+            for block in blocks:
+                block = block.strip()
+                if not block:
+                    continue
+                lines = block.split("\n")
+                msg = {}
+                content_lines = []
+                for line in lines:
+                    if line.startswith("Role: "):
+                        msg["role"] = line.replace("Role: ", "").strip()
+                    elif line.startswith("Content:"):
+                        # Start collecting content lines
+                        pass
+                    elif line.startswith("ToolCalls: "):
+                        try:
+                            msg["tool_calls"] = json.loads(line.replace("ToolCalls: ", "").strip())
+                        except Exception:
+                            pass
+                    elif line.startswith("ToolCallID: "):
+                        msg["tool_call_id"] = line.replace("ToolCallID: ", "").strip()
+                    else:
+                        content_lines.append(line)
+                if msg.get("role") and (content_lines or msg.get("tool_calls")):
+                    msg["content"] = "\n".join(content_lines).strip()
+                    messages.append(msg)
+        else:
+            # Start new session with welcome message and stage 0 instructions
+            messages.append({"role": "system", "content": welcome_message})
+            instructions = os.getenv(f"FOLLOWUP_STAGE_0")
+            if instructions:
+                messages.append({"role": "system", "content": instructions})
+
+        # Add followup stage instructions for non-zero stages
+        if followup_stage:
+            instruction_template = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
+            if instruction_template:
+                instructions = replace_dynamic_variables(instruction_template, user)
+                messages.append({"role": "system", "content": instructions})
+                # If no user_input, send the followup instructions to the LLM
+                if not user_input:
+                    try:
+                        response = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=messages,
+                            tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
+                            tool_choice="auto"
+                        )
+                        response_message = response.choices[0].message.content
+                        messages.append({"role": "assistant", "content": response_message})
+                        updated_conversation = convert_messages_to_string(messages)
+                        save_conversation(conversation=updated_conversation, contact_id=contact_id)
+                        return JSONResponse(status_code=200, content={"message": response_message})
+                    except Exception as e:
+                        return JSONResponse(status_code=500, content={"error": str(e)})
+
+        # Add new user message if provided
+        if user_input:
+            messages.append({
+                "role": "user",
+                "content": user_input
+            })
+
+        # Prepare the API request
         try:
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=messages,
-                tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
-                tool_choice="auto"
-            )
-            response_message = response.choices[0].message.content
-            # Append assistant response to session history
-            messages.append({
-                "role": "assistant",
-                "content": response_message
-            })
-            # Convert updated conversation to string
-            updated_conversation = convert_messages_to_string(messages)
-            save_conversation(conversation=updated_conversation, contact_id=contact_id)
-            return JSONResponse(status_code=200, content={"message": response_message})
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"error": str(e)})
-
-    # Add followup stage instructions for non-zero stages
-    if followup_stage:
-        instructions = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
-        if instructions:
-            messages.append({"role": "system", "content": instructions})
-            # If no user_input, send the followup instructions to the LLM
-            if not user_input:
-                try:
-                    response = client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=messages,
-                        tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
-                        tool_choice="auto"
-                    )
-                    response_message = response.choices[0].message.content
-                    # Append assistant response to session history
-                    messages.append({
-                        "role": "assistant",
-                        "content": response_message
-                    })
-                    # Convert updated conversation to string
-                    updated_conversation = convert_messages_to_string(messages)
-                    save_conversation(conversation=updated_conversation, contact_id=contact_id)
-                    return JSONResponse(status_code=200, content={"message": response_message})
-                except Exception as e:
-                    return JSONResponse(status_code=500, content={"error": str(e)})
-
-    # Add new user message if provided
-    if user_input:
-        messages.append({
-            "role": "user",
-            "content": user_input
-        })
-
-    # Prepare the API request
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
-            tool_choice="auto"
-        )
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-    # Process the response
-    choice = response.choices[0]
-    if choice.finish_reason == "tool_calls":
-        tool_calls = choice.message.tool_calls
-        tool_messages = []
-       
-        # Append the assistant's message *with* tool_calls to the history
-        messages.append({
-            "role": "assistant",
-            "content": choice.message.content or "",
-            "tool_calls": [
-                {
-                    "id": tool_call.id,
-                    "type": tool_call.type,
-                    "function": {
-                        "name": tool_call.function.name,
-                        "arguments": tool_call.function.arguments
-                    }
-                } for tool_call in tool_calls
-            ]
-        })
-
-        for tool_call in tool_calls:
-            if tool_call.type == "function" and tool_call.function.name == "get_weather":
-                try:
-                    args = json.loads(tool_call.function.arguments)
-                    result = get_weather(args["city"])
-                    tool_messages.append({
-                        "role": "tool",
-                        "content": result,
-                        "tool_call_id": tool_call.id
-                    })
-                except Exception as e:
-                    return JSONResponse(status_code=500, content={"message": f"Error processing tool call: {str(e)}", "conversation": conversation})
-            elif tool_call.type == "function" and tool_call.function.name == "add_contact":
-                args = json.loads(tool_call.function.arguments)
-                result = add_contact(
-                    name=args["name"],
-                    email=args["email"],
-                    phone=args["phone"],
-                    booked=args["booked"],
-                    date=args["date"],
-                    t=args["time"]
-                )
-                tool_messages.append({
-                    "role": "tool",
-                    "content": json.dumps(result),
-                    "tool_call_id": tool_call.id
-                })
-            elif tool_call.type == "function" and tool_call.function.name == "get_available_time_slots":
-                try:
-                    args = json.loads(tool_call.function.arguments)
-                    print("Get available time slots called with args:", args, flush=True)
-                    result = get_available_time_slots(args["start_date"], args["end_date"])
-                    print("Get available time slots result:", result, flush=True)
-                    tool_messages.append({
-                        "role": "tool",
-                        "content": json.dumps(result),
-                        "tool_call_id": tool_call.id
-                    })
-                except Exception as e:
-                    return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
-            elif tool_call.type == "function" and tool_call.function.name == "get_current_utc_datetime":
-                try:
-                    json.loads(tool_call.function.arguments)
-                    print("Get current UTC datetime called", flush=True)
-                    result = get_current_utc_datetime()
-                    print("Get current UTC datetime result:", result, flush=True)
-                    tool_messages.append({
-                        "role": "tool",
-                        "content": json.dumps(result),
-                        "tool_call_id": tool_call.id
-                    })
-                except Exception as e:
-                    return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
-
-        # Append tool response messages to history
-        messages.extend(tool_messages)
-
-        # Submit tool outputs and get final response
-        try:
-            final_response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=messages,
                 tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                 tool_choice="auto"
             )
-            response_message = final_response.choices[0].message.content
         except Exception as e:
             return JSONResponse(status_code=500, content={"error": str(e)})
-    else:
-        response_message = choice.message.content
 
-    # Append final assistant response to session history
-    messages.append({
-        "role": "assistant",
-        "content": response_message
-    })
+        # Process the response
+        choice = response.choices[0]
+        if choice.finish_reason == "tool_calls":
+            tool_calls = choice.message.tool_calls
+            tool_messages = []
+            # Append the assistant's message *with* tool_calls to the history
+            messages.append({
+                "role": "assistant",
+                "content": choice.message.content or "",
+                "tool_calls": [
+                    {
+                        "id": tool_call.id,
+                        "type": tool_call.type,
+                        "function": {
+                            "name": tool_call.function.name,
+                            "arguments": tool_call.function.arguments
+                        }
+                    } for tool_call in tool_calls
+                ]
+            })
 
-    # Convert updated conversation to string
-    updated_conversation = convert_messages_to_string(messages)
-    save_conversation(conversation=updated_conversation, contact_id=contact_id)
-    return JSONResponse(status_code=200, content={"message": response_message})
+            for tool_call in tool_calls:
+                if tool_call.type == "function" and tool_call.function.name == "get_weather":
+                    try:
+                        pass
+                    except Exception as e:
+                        pass
+                elif tool_call.type == "function" and tool_call.function.name == "add_contact":
+                    args = json.loads(tool_call.function.arguments)
+                    result = add_contact(
+                        name=args["name"],
+                        email=args["email"],
+                        phone=args["phone"],
+                        booked=args["booked"],
+                        date=args["date"],
+                        t=args["time"]
+                    )
+                    tool_messages.append({
+                        "role": "tool",
+                        "content": json.dumps(result),
+                        "tool_call_id": tool_call.id
+                    })
+                elif tool_call.type == "function" and tool_call.function.name == "get_available_time_slots":
+                    pass
+                elif tool_call.type == "function" and tool_call.function.name == "get_current_utc_datetime":
+                    try:
+                        json.loads(tool_call.function.arguments)
+                        print("Get current UTC datetime called", flush=True)
+                        result = get_current_utc_datetime()
+                        print("Get current UTC datetime result:", result, flush=True)
+                        tool_messages.append({
+                            "role": "tool",
+                            "content": json.dumps(result),
+                            "tool_call_id": tool_call.id
+                        })
+                    except Exception as e:
+                        return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
+
+            # Append tool response messages to history
+            messages.extend(tool_messages)
+
+            # Submit tool outputs and get final response
+            try:
+                final_response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=messages,
+                    tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
+                    tool_choice="auto"
+                )
+                response_message = final_response.choices[0].message.content
+            except Exception as e:
+                return JSONResponse(status_code=500, content={"error": str(e)})
+        else:
+            response_message = choice.message.content
+
+        # Append final assistant response to session history
+        messages.append({
+            "role": "assistant",
+            "content": response_message
+        })
+
+        # Convert updated conversation to string
+        updated_conversation = convert_messages_to_string(messages)
+        save_conversation(conversation=updated_conversation, contact_id=contact_id)
+        return JSONResponse(status_code=200, content={"message": response_message})
 
 def add_ai_message(contact_id: str, ai_message: str):
     """Add an AI-generated message to the conversation history for a given contact ID.
@@ -711,19 +672,24 @@ def add_ai_message(contact_id: str, ai_message: str):
             lines = block.split("\n")
             msg = {}
             content_lines = []
+            collecting_content = False
             for line in lines:
                 if line.startswith("Role: "):
                     msg["role"] = line.replace("Role: ", "").strip()
-                elif line.startswith("Content:\n"):
-                    content_lines.append(line.replace("Content:\n", "").strip())
+                    collecting_content = False
+                elif line.startswith("Content:"):
+                    collecting_content = True
+                    continue
                 elif line.startswith("ToolCalls: "):
                     msg["tool_calls"] = json.loads(line.replace("ToolCalls: ", "").strip())
+                    collecting_content = False
                 elif line.startswith("ToolCallID: "):
                     msg["tool_call_id"] = line.replace("ToolCallID: ", "").strip()
-                elif content_lines:
-                    content_lines.append(line.strip())
+                    collecting_content = False
+                elif collecting_content:
+                    content_lines.append(line)
             if content_lines:
-                msg["content"] = "\n".join(content_lines)
+                msg["content"] = "\n".join(content_lines).strip()
             if msg.get("role"):
                 messages.append(msg)
     
