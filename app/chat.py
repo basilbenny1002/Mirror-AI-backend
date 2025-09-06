@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 import PyPDF2
 from app.utils.tools import get_weather, add_contact, get_conversation, save_conversation, get_available_time_slots, get_current_utc_datetime
 from pathlib import Path
+from app.utils.tools import replace_dynamic_variables
+from app.main import ResumeChat
 # Load environment variables
 load_dotenv()
 api_key = os.getenv("OPEN_AI_API_KEY")
@@ -163,7 +165,6 @@ get_available_time_slots_tool = {
 
 # Storage for sessions (session_id to conversation history)
 sessions = {}
-
 
 def convert_messages_to_string(messages):
     """Convert session messages to a formatted string."""
@@ -450,7 +451,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     return JSONResponse(status_code=200, content={"message": response_message})
 
 
-def resume_chat_session(contactID: str, user_input: str, followup_stage: str = ""):
+def resume_chat_session(contactID: str, user_input: str,user: ResumeChat, followup_stage: str = "", ):
     """Resume or start a chat session from a conversation string, continue with new user input, and return updated conversation string.
    
     Args:
@@ -460,8 +461,9 @@ def resume_chat_session(contactID: str, user_input: str, followup_stage: str = "
     """
     welcome_message = final_instructions
     if followup_stage:
-        instructions = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
+        instruction_template = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
         print(f"Followup stage {followup_stage} instructions: {instructions} ", flush=True)
+        instructions = replace_dynamic_variables(instruction_template, user)
     # Initialize local messages list
     messages = []
     conversation = get_conversation(contactID)

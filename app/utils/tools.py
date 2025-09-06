@@ -319,4 +319,20 @@ def get_contact_info(contact_id: str):
 # get_contact_info("EvY019lK4vcvjzsNTp9F")
 # get_available_time_slots("2025-09-10 00:00:00", "2025-09-10 23:59:00")
 # resp = get_available_time_slots("2025-09-10T00:00:00Z", "2025-09-10T23:59:59Z")
-get_available_time_slots("2025-09-10 00:00:00","2025-09-10 23:59:59" )
+# get_available_time_slots("2025-09-10 00:00:00","2025-09-10 23:59:59" )
+
+
+def replace_dynamic_variables(template, data):
+    replacements = {
+        "_USER_NAME_": data.get("name", ""),
+        "_USER_EMAIL_": data.get("email", ""),
+        "_USER_PHONE_": data.get("phone", ""),
+        "_MEETING_NOTES_": data.get("notes", ""),
+        "_MEETING_DATE_": data.get("date", ""),
+        "_MEETING_TIME_": data.get("time", ""),
+        "_CURRENT_TIME_": get_current_utc_datetime()
+    }
+    result = template
+    for key, value in replacements.items():
+        result = result.replace(key, value)
+    return result
