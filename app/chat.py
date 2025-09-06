@@ -462,7 +462,7 @@ def resume_chat_session(contactID: str, user_input: str,user, followup_stage: st
     welcome_message = final_instructions
     if followup_stage:
         instruction_template = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
-        print(f"Followup stage {followup_stage} instructions: {instructions} ", flush=True)
+        # print(f"Followup stage {followup_stage} instructions: {instructions} ", flush=True)
         instructions = replace_dynamic_variables(instruction_template, user)
     # Initialize local messages list
     messages = []
