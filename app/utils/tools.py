@@ -84,72 +84,76 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
     Add or update a contact in GoHighLevel with custom fields.
     If the contact with the same email or phone exists, overwrite its info.
     """
-    try:
-        dt_str = f"{date} {t}"
-        
-        # Parse as UTC
-        dt_utc = datetime.strptime(dt_str, "%d-%b-%Y %I:%M %p").replace(tzinfo=ZoneInfo("UTC"))
-        iso_str = dt_utc.strftime("%Y-%m-%dT%H:%M:%SZ")  # format to compare with slots
+    if not(str(date).lower() == "cancelled" or str(t).lower() == "cancelled"):
+        try:
+            dt_str = f"{date} {t}"
+            
+            # Parse as UTC
+            dt_utc = datetime.strptime(dt_str, "%d-%b-%Y %I:%M %p").replace(tzinfo=ZoneInfo("UTC"))
+            iso_str = dt_utc.strftime("%Y-%m-%dT%H:%M:%SZ")  # format to compare with slots
 
-        # Build start and end of the same date (in UTC format)
-        day = dt_utc.strftime("%Y-%m-%d")
-        start = f"{day} 00:00:00"
-        end = f"{day} 23:59:59"
-        print(f"Checking availability for {iso_str} between {start} and {end}", flush=True)
-        # Get available slots for that date
-        available = get_available_time_slots(start, end)
-        print("\nAvailable slots response:\n", flush=True)
-        print(available, flush=True)
-        # slots = available.get("data", {}).get(str(day), {}).get("slots", [])
-        data_str = available.get("data", "{}")
-        data_dict = json.loads(data_str)
-        slots = data_dict.get(str(day), {}).get("slots", [])
+            # Build start and end of the same date (in UTC format)
+            day = dt_utc.strftime("%Y-%m-%d")
+            start = f"{day} 00:00:00"
+            end = f"{day} 23:59:59"
+            print(f"Checking availability for {iso_str} between {start} and {end}", flush=True)
+            # Get available slots for that date
+            available = get_available_time_slots(start, end)
+            print("\nAvailable slots response:\n", flush=True)
+            print(available, flush=True)
+            # slots = available.get("data", {}).get(str(day), {}).get("slots", [])
+            data_str = available.get("data", "{}")
+            data_dict = json.loads(data_str)
+            slots = data_dict.get(str(day), {}).get("slots", [])
 
-        # Check availability
-        if iso_str not in slots:
-            print("\nIso string response:\n", flush=True)
-            print(iso_str, "  ", slots, flush=True)
-            # Create a "dummy" contact structure to prevent the calling function from crashing.
-            # The 'message' will be passed to the next AI call to inform the user.
-            # The key is providing a customField list with 3 elements to avoid the index error.
-            error_payload = {
-                "status": "error",
-                "message": f"Sorry, the slot {date} {t} has already been taken.",
-                "data": {
-                    "contact": {
-                        "customField": [{}, {}, {}] # This safely fills the list
+            # Check availability
+            if iso_str not in slots:
+                print("\nIso string response:\n", flush=True)
+                print(iso_str, "  ", slots, flush=True)
+                # Create a "dummy" contact structure to prevent the calling function from crashing.
+                # The 'message' will be passed to the next AI call to inform the user.
+                # The key is providing a customField list with 3 elements to avoid the index error.
+                error_payload = {
+                    "status": "error",
+                    "message": f"Sorry, the slot {date} {t} has already been taken.",
+                    "data": {
+                        "contact": {
+                            "customField": [{}, {}, {}] # This safely fills the list
+                        }
                     }
                 }
-            }
-            print(f"Slot {date} {t} not available.", flush=True)
+                print(f"Slot {date} {t} not available.", flush=True)
+                return error_payload
+            # Convert to PDT
+            print("\nDate and time before timezone conversion:\n", flush=True)
+            print(date, " ", t, "\n", flush=True)
+            dt_pdt = dt_utc.astimezone(ZoneInfo("America/New_York"))
+            
+            # Format back
+            new_date = dt_pdt.strftime("%d-%b-%Y").upper()   # e.g. "21-OCT-2021"
+            new_time = dt_pdt.strftime("%I:%M %p")   
+            print("\nDate and time after timezone conversion:\n", flush=True)
+            print(new_date, " ", new_time, "\n", flush=True)
+        except Exception as e:
+            print(f"Error processing date/time: {e}", flush=True)
+            new_date = "cancelled"
+            new_time = "cancelled"
+            error_payload = {
+                    "status": "error",
+                    "message": f"Sorry an exception occurred: {str(e)}",
+                    "data": {
+                        "contact": {
+                            "customField": [{}, {}, {}] # This safely fills the list
+                        }
+                    }
+                }
+            print(f"{t}, {date}", flush=True)
             return error_payload
-        # Convert to PDT
-        print("\nDate and time before timezone conversion:\n", flush=True)
-        print(date, " ", t, "\n", flush=True)
-        dt_pdt = dt_utc.astimezone(ZoneInfo("America/New_York"))
-        
-        # Format back
-        new_date = dt_pdt.strftime("%d-%b-%Y").upper()   # e.g. "21-OCT-2021"
-        new_time = dt_pdt.strftime("%I:%M %p")   
-        print("\nDate and time after timezone conversion:\n", flush=True)
-        print(new_date, " ", new_time, "\n", flush=True)
-    except Exception as e:
-        print(f"Error processing date/time: {e}", flush=True)
+        else:
+            pass
+    else:
         new_date = "cancelled"
         new_time = "cancelled"
-        error_payload = {
-                "status": "error",
-                "message": f"Sorry an exception occurred: {str(e)}",
-                "data": {
-                    "contact": {
-                        "customField": [{}, {}, {}] # This safely fills the list
-                    }
-                }
-            }
-        print(f"{t}, {date}", flush=True)
-        return error_payload
-    else:
-        pass
 
 
     # Split name into first/last
