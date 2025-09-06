@@ -632,7 +632,7 @@ def resume_chat_session(contactID: str, user_input: str, followup_stage: str = "
             final_response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=messages,
-                tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
+                tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                 tool_choice="auto"
             )
             response_message = final_response.choices[0].message.content
@@ -653,3 +653,48 @@ def resume_chat_session(contactID: str, user_input: str, followup_stage: str = "
         updated_conversation += "---\n"
     save_conversation(conversation=updated_conversation, contact_id=contactID)
     return JSONResponse(status_code=200, content={"message": response_message})
+
+
+def add_ai_message(contact_id: str, ai_message: str):
+    """Add an AI-generated message to the conversation history for a given contact ID.
+
+    Args:
+        contact_id: Unique identifier for the contact
+        ai_message: The AI-generated message to append to the conversation
+    """
+    # Initialize messages list
+    messages = []
+    
+    # Retrieve existing conversation
+    conversation = get_conversation(contact_id)
+    
+    # Parse conversation string into messages if it exists
+    if conversation:
+        blocks = conversation.split("---\n")
+        for block in blocks:
+            if not block.strip():
+                continue
+            lines = block.split("\n")
+            role = lines[0].replace("Role: ", "").strip()
+            content_start = lines[1].replace("Content: ", "").strip()
+            messages.append({"role": role, "content": content_start})
+    
+    # Append the new AI message
+    messages.append({
+        "role": "assistant",
+        "content": ai_message
+    })
+    
+    # Convert updated conversation to string
+    updated_conversation = ""
+    for msg in messages:
+        updated_conversation += f"Role: {msg['role']}\n"
+        updated_conversation += f"Content: {msg['content']}\n"
+        updated_conversation += "---\n"
+    
+    # Save the updated conversation
+    try:
+        save_conversation(conversation=updated_conversation, contact_id=contact_id)
+        return {"status": "success", "message": "AI message added to conversation history"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
