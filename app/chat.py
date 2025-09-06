@@ -526,7 +526,9 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
         if followup_stage:
             instruction_template = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
             if instruction_template:
+                print(user.name, user.email, user.phone, user.reply,flush=True)
                 instructions = replace_dynamic_variables(instruction_template, user)
+                print(f"instructions for followup stage {followup_stage}:", instructions, flush=True)
                 messages.append({"role": "system", "content": instructions})
                 # If no user_input, send the followup instructions to the LLM
                 if not user_input:
