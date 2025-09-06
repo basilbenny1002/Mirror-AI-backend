@@ -677,9 +677,15 @@ def add_ai_message(contact_id: str, ai_message: str):
             if not block.strip():
                 continue
             lines = block.split("\n")
+            if len(lines) < 2 or not lines[0].startswith("Role: "):
+                continue  # Skip malformed blocks
             role = lines[0].replace("Role: ", "").strip()
-            content_start = lines[1].replace("Content: ", "").strip()
-            messages.append({"role": role, "content": content_start})
+            # Capture full content: everything after "Content: " in lines[1], plus subsequent lines
+            content = "\n".join(lines[1:])
+            if content.startswith("Content: "):
+                content = content[len("Content: "):]
+            content = content.strip()  # Matches original behavior, but preserves internal newlines
+            messages.append({"role": role, "content": content})
     
     # Append the new AI message
     messages.append({
@@ -697,6 +703,6 @@ def add_ai_message(contact_id: str, ai_message: str):
     # Save the updated conversation
     try:
         save_conversation(conversation=updated_conversation, contact_id=contact_id)
-        return  JSONResponse(status_code=200, content={"status": "success", "message": "AI message added to conversation history"})
+        return JSONResponse(status_code=200, content={"status": "success", "message": "AI message added to conversation history"})
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
