@@ -589,9 +589,15 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
             for tool_call in tool_calls:
                 if tool_call.type == "function" and tool_call.function.name == "get_weather":
                     try:
-                        pass
+                        args = json.loads(tool_call.function.arguments)
+                        result = get_weather(args["city"])
+                        tool_messages.append({
+                            "role": "tool",
+                            "content": result,
+                            "tool_call_id": tool_call.id
+                        })
                     except Exception as e:
-                        pass
+                        return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
                 elif tool_call.type == "function" and tool_call.function.name == "add_contact":
                     args = json.loads(tool_call.function.arguments)
                     result = add_contact(
@@ -608,7 +614,18 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                         "tool_call_id": tool_call.id
                     })
                 elif tool_call.type == "function" and tool_call.function.name == "get_available_time_slots":
-                    pass
+                    try:
+                        args = json.loads(tool_call.function.arguments)
+                        print("Get available time slots called with args:", args, flush=True)
+                        result = get_available_time_slots(args["start_date"], args["end_date"])
+                        print("Get available time slots result:", result, flush=True)
+                        tool_messages.append({
+                            "role": "tool",
+                            "content": json.dumps(result),
+                            "tool_call_id": tool_call.id
+                        })
+                    except Exception as e:
+                        return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
                 elif tool_call.type == "function" and tool_call.function.name == "get_current_utc_datetime":
                     try:
                         json.loads(tool_call.function.arguments)
