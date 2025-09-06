@@ -205,11 +205,11 @@ def save_conversation(conversation, name=None, email=None, phone=None, booked=No
     """
     if contact_id:
         conversations_col.update_one(
-        {"contact_id": contact_id},
-        {"$set": {"conversation": conversation}},
-        upsert=True
-    )
-        print(f"Conversation saved in MongoDB for contact_id {contact_id}")
+            {"contact_id": contact_id},
+            {"$set": {"conversation": conversation}},
+            upsert=True
+        )
+        print(f"Conversation saved in MongoDB for contact_id {contact_id}", flush=True)
         return
     else:
         if not conversation or (not email and not phone):
@@ -226,12 +226,12 @@ def save_conversation(conversation, name=None, email=None, phone=None, booked=No
         search_resp = requests.get(GHL_URL, headers=HEADERS, params=params)
 
         if search_resp.status_code != 200:
-            print(f"Error searching contact: {search_resp.text}")
+            print(f"Error searching contact: {search_resp.text}", flush=True)
             return
 
         contacts = search_resp.json().get("contacts", [])
         if not contacts:
-            print("No contact found with provided details.")
+            print("No contact found with provided details.", flush=True)
             return
 
         contact_id = contacts[0]["id"]

@@ -167,7 +167,7 @@ get_available_time_slots_tool = {
 sessions = {}
 
 def convert_messages_to_string(messages):
-    """Convert session messages to a formatted string."""
+    """Convert session messages to a formatted string, preserving tool metadata."""
     conversation = ""
     try:
         for msg in messages:
@@ -176,6 +176,10 @@ def convert_messages_to_string(messages):
             conversation += f"Role: {role}\n"
             conversation += "Content:\n"
             conversation += content + "\n"
+            if 'tool_calls' in msg:
+                conversation += f"ToolCalls: {json.dumps(msg['tool_calls'])}\n"
+            if 'tool_call_id' in msg:
+                conversation += f"ToolCallID: {msg['tool_call_id']}\n"
             conversation += "---\n"
     except Exception as e:
         print(f"Error converting messages to string: {str(e)}", flush=True)
@@ -228,6 +232,14 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
             save_conversation(conversation, name, email, phone, booked, contact_id=contact_id, t=t, date=date)
         del sessions[sid]
 
+    if session_id not in sessions:
+        sessions[session_id] = {
+            "messages": [
+                {"role": "system", "content": instructions}
+            ],
+            "last_activity": current_time
+        }
+
     # Save conversation for current session if add_contact was called
     if session_id in sessions:
         conversation = convert_messages_to_string(sessions[session_id]["messages"])
@@ -279,21 +291,17 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                                     contact_id = contact.get("id")
                                 except json.JSONDecodeError as e:
                                     print("JSON decode error in ending session add_contact parsing:", str(e), flush=True)
+            content = {"message": "Chat session ended, no conversation found."}
             if name or email or phone or booked or contact_id or date or t:
                 print("Saving ending session with contact details:", flush=True)
                 print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Date: {date}, Time: {t}, Contact ID: {contact_id}", flush=True)
-            save_conversation(conversation, name, email, phone, booked, contact_id=contact_id, t=t, date=date)
+                save_conversation(conversation, name, email, phone, booked, contact_id=contact_id, t=t, date=date)
+                content = {"message": "Chat session ended and saved."}
+                if contact_id:
+                    content["contact_id"] = contact_id
             del sessions[session_id]
-            return JSONResponse(status_code=200, content={"message": "Chat session ended and saved."})
+            return JSONResponse(status_code=200, content=content)
         return JSONResponse(status_code=200, content={"message": "Chat session ended, no conversation found."})
-
-    if session_id not in sessions:
-        sessions[session_id] = {
-            "messages": [
-                {"role": "system", "content": instructions}
-            ],
-            "last_activity": current_time
-        }
 
     # Update last activity timestamp
     sessions[session_id]["last_activity"] = current_time
@@ -317,6 +325,8 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
 
     # Process the response
     choice = response.choices[0]
+    is_new_contact = False
+    extracted_contact_id = None
     if choice.finish_reason == "tool_calls":
         tool_calls = choice.message.tool_calls
         print("Tool calls received:", [tool_call.function.name for tool_call in tool_calls], flush=True)
@@ -366,6 +376,14 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                     "content": json.dumps(result),
                     "tool_call_id": tool_call.id
                 })
+                try:
+                    result_parsed = result if isinstance(result, dict) else json.loads(result)
+                    contact = result_parsed.get("data", {}).get("contact", {})
+                    extracted_contact_id = contact.get("id")
+                    if extracted_contact_id:
+                        is_new_contact = True
+                except Exception as e:
+                    print("Error extracting contact_id from add_contact result:", str(e), flush=True)
             elif tool_call.type == "function" and tool_call.function.name == "get_available_time_slots":
                 try:
                     args = json.loads(tool_call.function.arguments)
@@ -448,25 +466,29 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
             print(f"Name: {name}, Email: {email}, Phone: {phone}, Booked: {booked}, Date: {date}, Time: {t}, Contact ID: {contact_id}", flush=True)
             save_conversation(conversation, name, email, phone, booked, contact_id, t, date )
 
-    return JSONResponse(status_code=200, content={"message": response_message})
+    content = {"message": response_message}
+    if is_new_contact and extracted_contact_id:
+        del sessions[session_id]
+        content["contact_id"] = extracted_contact_id
+    return JSONResponse(status_code=200, content=content)
 
-
-def resume_chat_session(contactID: str, user_input: str,user, followup_stage: str = "", ):
+def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: str = ""):
     """Resume or start a chat session from a conversation string, continue with new user input, and return updated conversation string.
    
     Args:
-        session_id: Unique identifier for the chat (not tied to global sessions)
+        contact_id: Unique identifier for the contact
         user_input: New user text prompt
-        conversation: String containing the previous conversation (optional)
+        user: User details for dynamic variable replacement
+        followup_stage: Optional stage for followup instructions
     """
     welcome_message = final_instructions
     if followup_stage:
         instruction_template = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
-        # print(f"Followup stage {followup_stage} instructions: {instructions} ", flush=True)
+        print(f"Followup stage {followup_stage} instructions: {instruction_template}", flush=True)
         instructions = replace_dynamic_variables(instruction_template, user)
     # Initialize local messages list
     messages = []
-    conversation = get_conversation(contactID)
+    conversation = get_conversation(contact_id)
     # Parse conversation string into messages if provided
     if conversation:
         blocks = conversation.split("---\n")
@@ -474,9 +496,23 @@ def resume_chat_session(contactID: str, user_input: str,user, followup_stage: st
             if not block.strip():
                 continue
             lines = block.split("\n")
-            role = lines[0].replace("Role: ", "").strip()
-            content_start = lines[1].replace("Content: ", "").strip()
-            messages.append({"role": role, "content": content_start})
+            msg = {}
+            content_lines = []
+            for line in lines:
+                if line.startswith("Role: "):
+                    msg["role"] = line.replace("Role: ", "").strip()
+                elif line.startswith("Content:\n"):
+                    content_lines.append(line.replace("Content:\n", "").strip())
+                elif line.startswith("ToolCalls: "):
+                    msg["tool_calls"] = json.loads(line.replace("ToolCalls: ", "").strip())
+                elif line.startswith("ToolCallID: "):
+                    msg["tool_call_id"] = line.replace("ToolCallID: ", "").strip()
+                elif content_lines:
+                    content_lines.append(line.strip())
+            if content_lines:
+                msg["content"] = "\n".join(content_lines)
+            if msg.get("role"):
+                messages.append(msg)
     else:
         # Start new session with welcome message and stage 0 instructions
         messages.append({"role": "system", "content": welcome_message})
@@ -498,15 +534,12 @@ def resume_chat_session(contactID: str, user_input: str,user, followup_stage: st
                 "content": response_message
             })
             # Convert updated conversation to string
-            updated_conversation = ""
-            for msg in messages:
-                updated_conversation += f"Role: {msg['role']}\n"
-                updated_conversation += f"Content: {msg['content']}\n"
-                updated_conversation += "---\n"
-            save_conversation(conversation=updated_conversation, contact_id=contactID)
+            updated_conversation = convert_messages_to_string(messages)
+            save_conversation(conversation=updated_conversation, contact_id=contact_id)
             return JSONResponse(status_code=200, content={"message": response_message})
         except Exception as e:
             return JSONResponse(status_code=500, content={"error": str(e)})
+
     # Add followup stage instructions for non-zero stages
     if followup_stage:
         instructions = os.getenv(f"FOLLOWUP_STAGE_{followup_stage}")
@@ -528,21 +561,19 @@ def resume_chat_session(contactID: str, user_input: str,user, followup_stage: st
                         "content": response_message
                     })
                     # Convert updated conversation to string
-                    updated_conversation = ""
-                    for msg in messages:
-                        updated_conversation += f"Role: {msg['role']}\n"
-                        updated_conversation += f"Content: {msg['content']}\n"
-                        updated_conversation += "---\n"
-                    save_conversation(conversation=updated_conversation, contact_id=contactID)
+                    updated_conversation = convert_messages_to_string(messages)
+                    save_conversation(conversation=updated_conversation, contact_id=contact_id)
                     return JSONResponse(status_code=200, content={"message": response_message})
                 except Exception as e:
                     return JSONResponse(status_code=500, content={"error": str(e)})
+
     # Add new user message if provided
     if user_input:
         messages.append({
             "role": "user",
             "content": user_input
         })
+
     # Prepare the API request
     try:
         response = client.chat.completions.create(
@@ -553,6 +584,7 @@ def resume_chat_session(contactID: str, user_input: str,user, followup_stage: st
         )
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+
     # Process the response
     choice = response.choices[0]
     if choice.finish_reason == "tool_calls":
@@ -574,6 +606,7 @@ def resume_chat_session(contactID: str, user_input: str,user, followup_stage: st
                 } for tool_call in tool_calls
             ]
         })
+
         for tool_call in tool_calls:
             if tool_call.type == "function" and tool_call.function.name == "get_weather":
                 try:
@@ -627,8 +660,10 @@ def resume_chat_session(contactID: str, user_input: str,user, followup_stage: st
                     })
                 except Exception as e:
                     return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
+
         # Append tool response messages to history
         messages.extend(tool_messages)
+
         # Submit tool outputs and get final response
         try:
             final_response = client.chat.completions.create(
@@ -642,20 +677,17 @@ def resume_chat_session(contactID: str, user_input: str,user, followup_stage: st
             return JSONResponse(status_code=500, content={"error": str(e)})
     else:
         response_message = choice.message.content
+
     # Append final assistant response to session history
     messages.append({
         "role": "assistant",
         "content": response_message
     })
-    # Convert updated conversation to string
-    updated_conversation = ""
-    for msg in messages:
-        updated_conversation += f"Role: {msg['role']}\n"
-        updated_conversation += f"Content: {msg['content']}\n"
-        updated_conversation += "---\n"
-    save_conversation(conversation=updated_conversation, contact_id=contactID)
-    return JSONResponse(status_code=200, content={"message": response_message})
 
+    # Convert updated conversation to string
+    updated_conversation = convert_messages_to_string(messages)
+    save_conversation(conversation=updated_conversation, contact_id=contact_id)
+    return JSONResponse(status_code=200, content={"message": response_message})
 
 def add_ai_message(contact_id: str, ai_message: str):
     """Add an AI-generated message to the conversation history for a given contact ID.
@@ -677,28 +709,32 @@ def add_ai_message(contact_id: str, ai_message: str):
             if not block.strip():
                 continue
             lines = block.split("\n")
-            if len(lines) < 2 or not lines[0].startswith("Role: "):
-                continue  # Skip malformed blocks
-            role = lines[0].replace("Role: ", "").strip()
-            # Capture full content: everything after "Content: " in lines[1], plus subsequent lines
-            content = "\n".join(lines[1:])
-            if content.startswith("Content: "):
-                content = content[len("Content: "):]
-            content = content.strip()  # Matches original behavior, but preserves internal newlines
-            messages.append({"role": role, "content": content})
+            msg = {}
+            content_lines = []
+            for line in lines:
+                if line.startswith("Role: "):
+                    msg["role"] = line.replace("Role: ", "").strip()
+                elif line.startswith("Content:\n"):
+                    content_lines.append(line.replace("Content:\n", "").strip())
+                elif line.startswith("ToolCalls: "):
+                    msg["tool_calls"] = json.loads(line.replace("ToolCalls: ", "").strip())
+                elif line.startswith("ToolCallID: "):
+                    msg["tool_call_id"] = line.replace("ToolCallID: ", "").strip()
+                elif content_lines:
+                    content_lines.append(line.strip())
+            if content_lines:
+                msg["content"] = "\n".join(content_lines)
+            if msg.get("role"):
+                messages.append(msg)
     
     # Append the new AI message
     messages.append({
         "role": "assistant",
-        "content": ai_message
+        "content": ai_message + "<admin>This message was sent to the user via SMS</admin>"
     })
     
     # Convert updated conversation to string
-    updated_conversation = ""
-    for msg in messages:
-        updated_conversation += f"Role: {msg['role']}\n"
-        updated_conversation += f"Content: {msg['content']}\n"
-        updated_conversation += "---\n"
+    updated_conversation = convert_messages_to_string(messages)
     
     # Save the updated conversation
     try:
