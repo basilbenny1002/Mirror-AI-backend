@@ -84,6 +84,7 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
     Add or update a contact in GoHighLevel with custom fields.
     If the contact with the same email or phone exists, overwrite its info.
     """
+    print(f"Adding/updating contact: {name}, {email}, {phone}, {booked}, {t}, {date}", flush=True)
     if not(str(date).lower() == "cancelled" or str(t).lower() == "cancelled"):
         try:
             dt_str = f"{date} {t}"
@@ -332,3 +333,5 @@ def replace_dynamic_variables(template, data):
     template = template.replace("_CURRENT_TIME_", get_current_utc_datetime())
 
     return template
+
+print(get_conversation("eWVjjelB67z7cbrlKkO5"))

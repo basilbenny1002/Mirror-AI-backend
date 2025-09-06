@@ -468,7 +468,6 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
 
     content = {"message": response_message}
     if is_new_contact and extracted_contact_id:
-        del sessions[session_id]
         content["contact_id"] = extracted_contact_id
     return JSONResponse(status_code=200, content=content)
 
