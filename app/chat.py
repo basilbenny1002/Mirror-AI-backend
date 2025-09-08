@@ -315,7 +315,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     # Prepare the API request
     try:
         response = client.chat.completions.create(
-            model="gpt-5", #"o1" gpt-4o-minni
+            model="gpt-5-mini", #"o1" gpt-4o-minni
             messages=sessions[session_id]["messages"],
             tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
             tool_choice="auto"
@@ -418,7 +418,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         # Submit tool outputs and get final response
         try:
             final_response = client.chat.completions.create(
-                model="gpt-5",
+                model="gpt-5-mini",
                 messages=sessions[session_id]["messages"],
                 tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
                 tool_choice="auto"
@@ -534,7 +534,7 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                 if not user_input:
                     try:
                         response = client.chat.completions.create(
-                            model="gpt-5",
+                            model="gpt-5-mini",
                             messages=messages,
                             tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                             tool_choice="auto"
@@ -557,7 +557,7 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
         # Prepare the API request
         try:
             response = client.chat.completions.create(
-                model="gpt-5",
+                model="gpt-5-mini",
                 messages=messages,
                 tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                 tool_choice="auto"
@@ -646,7 +646,7 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
             # Submit tool outputs and get final response
             try:
                 final_response = client.chat.completions.create(
-                    model="gpt-5",
+                    model="gpt-5-mini",
                     messages=messages,
                     tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                     tool_choice="auto"
