@@ -328,88 +328,85 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     is_new_contact = False
     extracted_contact_id = None
     if choice.finish_reason == "tool_calls":
-        tool_calls = choice.message.tool_calls
-        print("Tool calls received:", [tool_call.function.name for tool_call in tool_calls], flush=True)
+        tool_calls = getattr(choice.message, "tool_calls", [])
+        print("Tool calls received:", [getattr(tc.function, "name", "") for tc in tool_calls], flush=True)
         tool_messages = []
         # Append the assistant's message *with* tool_calls to the session history
         sessions[session_id]["messages"].append({
-                "role": "assistant",
-                "content": str(choice.message.content) if choice.message.content is not None else "",
-                "tool_calls": [
-                    {
-                        "id": tool_call.id,
-                        "type": tool_call.type,
-                        "function": {
-                            "name": tool_call.function.name,
-                            "arguments": tool_call.function.arguments
-                        }
-                    } for tool_call in tool_calls
-                ]
-            })
+            "role": "assistant",
+            "content": str(choice.message.content) if choice.message.content is not None else "",
+            "tool_calls": [
+                {
+                    "id": getattr(tool_call, "id", ""),
+                    "type": getattr(tool_call, "type", ""),
+                    "function": {
+                        "name": getattr(tool_call.function, "name", ""),
+                        "arguments": getattr(tool_call.function, "arguments", "")
+                    }
+                } for tool_call in tool_calls
+            ]
+        })
 
         for tool_call in tool_calls:
-            if tool_call.type == "function" and tool_call.function.name == "get_weather":
-                try:
-                    args = json.loads(tool_call.function.arguments)
+            try:
+                fn_name = getattr(tool_call.function, "name", "")
+                args = json.loads(getattr(tool_call.function, "arguments", "{}"))
+                if fn_name == "get_weather":
                     result = get_weather(args["city"])
                     tool_messages.append({
                         "role": "tool",
-                        "content": result,
-                        "tool_call_id": tool_call.id
+                        "content": str(result) if result is not None else "",
+                        "tool_call_id": getattr(tool_call, "id", "")
                     })
-                except Exception as e:
-                    return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
-            elif tool_call.type == "function" and tool_call.function.name == "add_contact":
-                args = json.loads(tool_call.function.arguments)
-                print("Add contact called with args:", args, flush=True)
-                result = add_contact(
-                    name=args["name"],
-                    email=args["email"],
-                    phone=args["phone"],
-                    booked=args["booked"],
-                    date=args["date"],
-                    t=args["time"]
-                )
-                print("Add contact result:", result, flush=True)
-                tool_messages.append({
-                    "role": "tool",
-                    "content": json.dumps(result),
-                    "tool_call_id": tool_call.id
-                })
-                try:
-                    result_parsed = result if isinstance(result, dict) else json.loads(result)
-                    contact = result_parsed.get("data", {}).get("contact", {})
-                    extracted_contact_id = contact.get("id")
-                    if extracted_contact_id:
-                        is_new_contact = True
-                except Exception as e:
-                    print("Error extracting contact_id from add_contact result:", str(e), flush=True)
-            elif tool_call.type == "function" and tool_call.function.name == "get_available_time_slots":
-                try:
-                    args = json.loads(tool_call.function.arguments)
+                elif fn_name == "add_contact":
+                    print("Add contact called with args:", args, flush=True)
+                    result = add_contact(
+                        name=args["name"],
+                        email=args["email"],
+                        phone=args["phone"],
+                        booked=args["booked"],
+                        date=args["date"],
+                        t=args["time"]
+                    )
+                    print("Add contact result:", result, flush=True)
+                    tool_messages.append({
+                        "role": "tool",
+                        "content": json.dumps(result) if result is not None else "",
+                        "tool_call_id": getattr(tool_call, "id", "")
+                    })
+                    try:
+                        result_parsed = result if isinstance(result, dict) else json.loads(result)
+                        contact = result_parsed.get("data", {}).get("contact", {})
+                        extracted_contact_id = contact.get("id")
+                        if extracted_contact_id:
+                            is_new_contact = True
+                    except Exception as e:
+                        print("Error extracting contact_id from add_contact result:", str(e), flush=True)
+                elif fn_name == "get_available_time_slots":
                     print("Get available time slots called with args:", args, flush=True)
                     result = get_available_time_slots(args["start_date"], args["end_date"])
                     print("Get available time slots result:", result, flush=True)
                     tool_messages.append({
                         "role": "tool",
-                        "content": json.dumps(result),
-                        "tool_call_id": tool_call.id
+                        "content": json.dumps(result) if result is not None else "",
+                        "tool_call_id": getattr(tool_call, "id", "")
                     })
-                except Exception as e:
-                    return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
-            elif tool_call.type == "function" and tool_call.function.name == "get_current_utc_datetime":
-                try:
-                    json.loads(tool_call.function.arguments)
+                elif fn_name == "get_current_utc_datetime":
                     print("Get current UTC datetime called", flush=True)
                     result = get_current_utc_datetime()
                     print("Get current UTC datetime result:", result, flush=True)
                     tool_messages.append({
                         "role": "tool",
-                        "content": json.dumps(result),
-                        "tool_call_id": tool_call.id
+                        "content": json.dumps(result) if result is not None else "",
+                        "tool_call_id": getattr(tool_call, "id", "")
                     })
-                except Exception as e:
-                    return JSONResponse(status_code=500, content={"error": f"Error processing tool call: {str(e)}"})
+            except Exception as e:
+                print(f"Error processing tool call {getattr(tool_call.function, 'name', '')}: {str(e)}", flush=True)
+                tool_messages.append({
+                    "role": "tool",
+                    "content": f"Error: {str(e)}",
+                    "tool_call_id": getattr(tool_call, "id", "")
+                })
         print("Tool messages to append:", tool_messages, flush=True)
 
         # Append tool messages to history
@@ -433,8 +430,27 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     # Append final assistant response to session history
     sessions[session_id]["messages"].append({
         "role": "assistant",
-        "content": response_message
+        "content": str(response_message) if response_message is not None else ""
     })
+
+    # If the assistant's response is empty, automatically retry once
+    if response_message is None or str(response_message).strip() == "":
+        print("Assistant response was empty, retrying once...", flush=True)
+        try:
+            retry_response = client.chat.completions.create(
+                model="gpt-5-mini",
+                messages=sessions[session_id]["messages"],
+                tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
+                tool_choice="auto"
+            )
+            retry_message = retry_response.choices[0].message.content
+            sessions[session_id]["messages"].append({
+                "role": "assistant",
+                "content": str(retry_message) if retry_message is not None else ""
+            })
+            response_message = retry_message
+        except Exception as e:
+            print(f"Error during assistant retry: {str(e)}", flush=True)
 
     # Update last activity timestamp after successful response
     sessions[session_id]["last_activity"] = time.time()
