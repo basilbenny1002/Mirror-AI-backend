@@ -308,14 +308,14 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
 
     # Add user message to session history
     sessions[session_id]["messages"].append({
-        "role": "user",
-        "content": user_input
-    })
+            "role": "user",
+            "content": str(user_input) if user_input is not None else ""
+        })
 
     # Prepare the API request
     try:
         response = client.chat.completions.create(
-            model="gpt-5", #"o1" gpt-4o-minni
+            model="gpt-5-mini", #"o1" gpt-4o-minni
             messages=sessions[session_id]["messages"],
             tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
             tool_choice="auto"
@@ -333,19 +333,19 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         tool_messages = []
         # Append the assistant's message *with* tool_calls to the session history
         sessions[session_id]["messages"].append({
-            "role": "assistant",
-            "content": choice.message.content or "",
-            "tool_calls": [
-                {
-                    "id": tool_call.id,
-                    "type": tool_call.type,
-                    "function": {
-                        "name": tool_call.function.name,
-                        "arguments": tool_call.function.arguments
-                    }
-                } for tool_call in tool_calls
-            ]
-        })
+                "role": "assistant",
+                "content": str(choice.message.content) if choice.message.content is not None else "",
+                "tool_calls": [
+                    {
+                        "id": tool_call.id,
+                        "type": tool_call.type,
+                        "function": {
+                            "name": tool_call.function.name,
+                            "arguments": tool_call.function.arguments
+                        }
+                    } for tool_call in tool_calls
+                ]
+            })
 
         for tool_call in tool_calls:
             if tool_call.type == "function" and tool_call.function.name == "get_weather":
@@ -418,7 +418,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         # Submit tool outputs and get final response
         try:
             final_response = client.chat.completions.create(
-                model="gpt-5",
+                model="gpt-5-mini",
                 messages=sessions[session_id]["messages"],
                 tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
                 tool_choice="auto"
@@ -481,46 +481,44 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
         followup_stage: Optional stage for followup instructions
     """
     welcome_message = final_instructions
-    if followup_stage:
-        welcome_message = final_instructions
-        messages = []
-        conversation = get_conversation(contact_id)
-        print("Retrieved conversation:", conversation, flush=True)
+    messages = []
+    conversation = get_conversation(contact_id)
+    print("Retrieved conversation:", conversation, flush=True)
 
-        # Parse conversation string into messages if provided
-        if conversation:
-            blocks = conversation.split("---\n")
-            for block in blocks:
-                block = block.strip()
-                if not block:
-                    continue
-                lines = block.split("\n")
-                msg = {}
-                content_lines = []
-                for line in lines:
-                    if line.startswith("Role: "):
-                        msg["role"] = line.replace("Role: ", "").strip()
-                    elif line.startswith("Content:"):
-                        # Start collecting content lines
+    # Parse conversation string into messages if provided
+    if conversation:
+        blocks = conversation.split("---\n")
+        for block in blocks:
+            block = block.strip()
+            if not block:
+                continue
+            lines = block.split("\n")
+            msg = {}
+            content_lines = []
+            for line in lines:
+                if line.startswith("Role: "):
+                    msg["role"] = line.replace("Role: ", "").strip()
+                elif line.startswith("Content:"):
+                    # Start collecting content lines
+                    pass
+                elif line.startswith("ToolCalls: "):
+                    try:
+                        msg["tool_calls"] = json.loads(line.replace("ToolCalls: ", "").strip())
+                    except Exception:
                         pass
-                    elif line.startswith("ToolCalls: "):
-                        try:
-                            msg["tool_calls"] = json.loads(line.replace("ToolCalls: ", "").strip())
-                        except Exception:
-                            pass
-                    elif line.startswith("ToolCallID: "):
-                        msg["tool_call_id"] = line.replace("ToolCallID: ", "").strip()
-                    else:
-                        content_lines.append(line)
-                if msg.get("role") and (content_lines or msg.get("tool_calls")):
-                    msg["content"] = "\n".join(content_lines).strip()
-                    messages.append(msg)
-        else:
-            # Start new session with welcome message and stage 0 instructions
-            messages.append({"role": "system", "content": welcome_message})
-            instructions = os.getenv(f"FOLLOWUP_STAGE_0")
-            if instructions:
-                messages.append({"role": "system", "content": instructions})
+                elif line.startswith("ToolCallID: "):
+                    msg["tool_call_id"] = line.replace("ToolCallID: ", "").strip()
+                else:
+                    content_lines.append(line)
+            if msg.get("role") and (content_lines or msg.get("tool_calls")):
+                msg["content"] = str("\n".join(content_lines).strip()) if content_lines else ""
+                messages.append(msg)
+    else:
+        # Start new session with welcome message and stage 0 instructions
+        messages.append({"role": "system", "content": str(welcome_message) if welcome_message is not None else ""})
+        instructions = os.getenv(f"FOLLOWUP_STAGE_0")
+        if instructions:
+            messages.append({"role": "system", "content": str(instructions) if instructions is not None else ""})
 
         # Add followup stage instructions for non-zero stages
         if followup_stage:
@@ -529,17 +527,17 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                 print(user.name, user.email, user.phone, user.reply,flush=True)
                 instructions = replace_dynamic_variables(instruction_template, user)
                 print(f"instructions for followup stage {followup_stage}:", instructions, flush=True)
-                messages.append({"role": "system", "content": instructions})
+                messages.append({"role": "system", "content": str(instructions) if instructions is not None else ""})
                 # If no user_input, send the followup instructions to the LLM
                 if not user_input:
                     try:
                         response = client.chat.completions.create(
-                            model="gpt-5",
+                            model="gpt-5-mini",
                             messages=messages,
                             tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                             tool_choice="auto"
                         )
-                        response_message = response.choices[0].message.content
+                        response_message = str(response.choices[0].message.content) if response.choices[0].message.content is not None else ""
                         messages.append({"role": "assistant", "content": response_message})
                         updated_conversation = convert_messages_to_string(messages)
                         save_conversation(conversation=updated_conversation, contact_id=contact_id)
@@ -551,13 +549,13 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
         if user_input:
             messages.append({
                 "role": "user",
-                "content": user_input
+                "content": str(user_input) if user_input is not None else ""
             })
 
         # Prepare the API request
         try:
             response = client.chat.completions.create(
-                model="gpt-5",
+                model="gpt-5-mini",
                 messages=messages,
                 tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                 tool_choice="auto"
@@ -567,13 +565,14 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
 
         # Process the response
         choice = response.choices[0]
+        response_message = str(choice.message.content) if choice.message.content is not None else ""
         if choice.finish_reason == "tool_calls":
             tool_calls = choice.message.tool_calls
             tool_messages = []
             # Append the assistant's message *with* tool_calls to the history
             messages.append({
                 "role": "assistant",
-                "content": choice.message.content or "",
+                "content": str(choice.message.content) if choice.message.content is not None else "",
                 "tool_calls": [
                     {
                         "id": tool_call.id,
@@ -593,7 +592,7 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                         result = get_weather(args["city"])
                         tool_messages.append({
                             "role": "tool",
-                            "content": result,
+                            "content": str(result) if result is not None else "",
                             "tool_call_id": tool_call.id
                         })
                     except Exception as e:
@@ -610,7 +609,7 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                     )
                     tool_messages.append({
                         "role": "tool",
-                        "content": json.dumps(result),
+                        "content": json.dumps(result) if result is not None else "",
                         "tool_call_id": tool_call.id
                     })
                 elif tool_call.type == "function" and tool_call.function.name == "get_available_time_slots":
@@ -621,7 +620,7 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                         print("Get available time slots result:", result, flush=True)
                         tool_messages.append({
                             "role": "tool",
-                            "content": json.dumps(result),
+                            "content": json.dumps(result) if result is not None else "",
                             "tool_call_id": tool_call.id
                         })
                     except Exception as e:
@@ -634,7 +633,7 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                         print("Get current UTC datetime result:", result, flush=True)
                         tool_messages.append({
                             "role": "tool",
-                            "content": json.dumps(result),
+                            "content": json.dumps(result) if result is not None else "",
                             "tool_call_id": tool_call.id
                         })
                     except Exception as e:
@@ -646,21 +645,19 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
             # Submit tool outputs and get final response
             try:
                 final_response = client.chat.completions.create(
-                    model="gpt-5",
+                    model="gpt-5-mini",
                     messages=messages,
                     tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                     tool_choice="auto"
                 )
-                response_message = final_response.choices[0].message.content
+                response_message = str(final_response.choices[0].message.content) if final_response.choices[0].message.content is not None else ""
             except Exception as e:
                 return JSONResponse(status_code=500, content={"error": str(e)})
-        else:
-            response_message = choice.message.content
 
         # Append final assistant response to session history
         messages.append({
             "role": "assistant",
-            "content": response_message
+            "content": str(response_message) if response_message is not None else ""
         })
 
         # Convert updated conversation to string
