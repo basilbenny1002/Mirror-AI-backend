@@ -17,8 +17,9 @@ if not api_key:
     raise ValueError("OPEN_AI_API_KEY not found in .env file. Ensure .env contains: OPEN_AI_API_KEY=your-api-key-here")
 
 # Initialize OpenAI client
-client = OpenAI(api_key=api_key)
-
+client = OpenAI(base_url="https://openrouter.ai/api/v1",api_key=api_key)
+# model = os.getenv("MODEL_NAME")
+model="google/gemini-2.5-pro"
 # Extract text from the PDF file
 pdf_path = "Wallace Energy combined pdf.pdf"
 if not os.path.exists(pdf_path):
@@ -315,7 +316,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     # Prepare the API request
     try:
         response = client.chat.completions.create(
-            model="gpt-5", #"o1" gpt-4o-minni
+            model=model, #"o1" gpt-4o-minni
             messages=sessions[session_id]["messages"],
             tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
             tool_choice="auto"
@@ -418,7 +419,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         # Submit tool outputs and get final response
         try:
             final_response = client.chat.completions.create(
-                model="gpt-5",
+                model=model,
                 messages=sessions[session_id]["messages"],
                 tools=[weather_tool, add_contact_tool, get_available_time_slots_tool, ],
                 tool_choice="auto"
@@ -534,7 +535,7 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                 if not user_input:
                     try:
                         response = client.chat.completions.create(
-                            model="gpt-5",
+                            model=model,
                             messages=messages,
                             tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                             tool_choice="auto"
@@ -557,7 +558,7 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
         # Prepare the API request
         try:
             response = client.chat.completions.create(
-                model="gpt-5",
+                model=model,
                 messages=messages,
                 tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                 tool_choice="auto"
@@ -646,7 +647,7 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
             # Submit tool outputs and get final response
             try:
                 final_response = client.chat.completions.create(
-                    model="gpt-5",
+                    model=model,
                     messages=messages,
                     tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                     tool_choice="auto"
