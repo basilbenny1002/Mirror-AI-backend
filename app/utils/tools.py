@@ -37,7 +37,11 @@ HEADERS = {
 BOOKED_FIELD_ID = "59g21lZwv0U3YJBXtQcc"#"r9wLa2H8weqkXfIHgmLA" 59g21lZwv0U3YJBXtQcc       # e.g. "Booked Call" field
 TIME_FIELD_ID = "B4x2SRqU3csMnTw6q8mo"#"Ogr5kUZzwCTtMXQxMf17"   B4x2SRqU3csMnTw6q8mo       # e.g. "Call Time" field
 DATE_FIELD_ID = "4V5u1RjpZ5Lna5QNLeZr"#"SMDVlM8yUR534vvOPkjn"    "4V5u1RjpZ5Lna5QNLeZr"      # e.g. "Call Date" field
-
+ROLE_FIELD_ID = "role"  # e.g. "Role" field
+CAUSE_FIELD_ID = "cause"  # e.g. "Cause" field
+ADDRESS_FIELD_ID = "address"  # e.g. "Address" field
+PROPERTY_TYPE_FIELD_ID = "property"  # e.g. "Property" field
+PROPERTY_DETAILS_FIELD_ID = "property_details"  # e.g. "Property Details" field
 
 def to_unix(date_str: str) -> int:
     if not date_str:
@@ -79,12 +83,12 @@ def get_weather(city: str):
 
 
 
-def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: str):
+def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: str, role: str, cause: str, address: str, property_type: str, property_details: str):
     """
     Add or update a contact in GoHighLevel with custom fields.
     If the contact with the same email or phone exists, overwrite its info.
     """
-    print(f"Adding/updating contact: {name}, {email}, {phone}, {booked}, {t}, {date}", flush=True)
+    print(f"Adding/updating contact: {name}, {email}, {phone}, {booked}, {t}, {date}, {role}, {cause}, {address}, {property_type}, {property_details}", flush=True)
     if not(str(date).lower() == "cancelled" or str(t).lower() == "cancelled"):
         try:
             dt_str = f"{date} {t}"
@@ -119,7 +123,7 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
                     "message": f"Sorry, the slot {date} {t} has already been taken.",
                     "data": {
                         "contact": {
-                            "customField": [{}, {}, {}] # This safely fills the list
+                            "customField": [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}] # This safely fills the list
                         }
                     }
                 }
@@ -144,7 +148,7 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
                     "message": f"Sorry an exception occurred: {str(e)}",
                     "data": {
                         "contact": {
-                            "customField": [{}, {}, {}] # This safely fills the list
+                            "customField": [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}] # This safely fills the list
                         }
                     }
                 }
@@ -180,7 +184,13 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
         "customField": {
             BOOKED_FIELD_ID: booked,
             TIME_FIELD_ID: new_time,
-            DATE_FIELD_ID: new_date
+            DATE_FIELD_ID: new_date,
+            ROLE_FIELD_ID: role,  # Default to "Buyer"
+            CAUSE_FIELD_ID: cause,  # Default to "N/A"
+            ADDRESS_FIELD_ID: address,  # Default to "N/A"
+            PROPERTY_TYPE_FIELD_ID: property_type,  # Default to "N/A"
+            PROPERTY_DETAILS_FIELD_ID: property_details,  # Default to "N/A"
+
         }
     }
 
