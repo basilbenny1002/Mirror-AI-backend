@@ -37,11 +37,11 @@ HEADERS = {
 BOOKED_FIELD_ID = "59g21lZwv0U3YJBXtQcc"#"r9wLa2H8weqkXfIHgmLA" 59g21lZwv0U3YJBXtQcc       # e.g. "Booked Call" field
 TIME_FIELD_ID = "B4x2SRqU3csMnTw6q8mo"#"Ogr5kUZzwCTtMXQxMf17"   B4x2SRqU3csMnTw6q8mo       # e.g. "Call Time" field
 DATE_FIELD_ID = "4V5u1RjpZ5Lna5QNLeZr"#"SMDVlM8yUR534vvOPkjn"    "4V5u1RjpZ5Lna5QNLeZr"      # e.g. "Call Date" field
-ROLE_FIELD_ID = "role"  # e.g. "Role" field
-CAUSE_FIELD_ID = "cause"  # e.g. "Cause" field
-ADDRESS_FIELD_ID = "address"  # e.g. "Address" field
-PROPERTY_TYPE_FIELD_ID = "property"  # e.g. "Property" field
-PROPERTY_DETAILS_FIELD_ID = "property_details"  # e.g. "Property Details" field
+ROLE_FIELD_ID = "DUHytN2BwNIfmriWngqJ"  # e.g. "Role" field
+CAUSE_FIELD_ID = "J1bOi2Ab8Uft3Ikrbfqg"  # e.g. "Cause" field
+ADDRESS_FIELD_ID = "iuisj6SiXN5nGWWXwqHJ"  # e.g. "Address" field
+PROPERTY_TYPE_FIELD_ID = "Zga17He1MM0vIc9WgVcx"  # e.g. "Property" field
+PROPERTY_DETAILS_FIELD_ID = "X0BJ4sYFkBZmD4z3L0lm"  # e.g. "Property Details" field
 
 def to_unix(date_str: str) -> int:
     if not date_str:
