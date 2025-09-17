@@ -8,7 +8,7 @@ from pymongo import MongoClient
 from datetime import datetime
 import http.client
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import requests
 
 
@@ -300,18 +300,40 @@ def get_available_time_slots(start_date: str, end_date: str) -> dict:
         return {"status": "error", "code": res.status, "message": str(data.decode("utf-8"))}
     
 
-def get_current_utc_datetime() -> dict:
+def get_current_utc_datetime() -> str:
     """
-    Get the current date and time in UTC.
+    Get the current date and time in UTC and for the next 7 days.
 
     Returns:
-        dict: Contains the current UTC datetime in both ISO 8601 format and Unix timestamp.
+        str: Contains the current UTC datetime and the date and day for the next 7 days.
     """
     now = datetime.now(timezone.utc)
-    return f"The current iso time is {now.isoformat()} and the unix timestamp is {int(now.timestamp())} and the normal one is {now.strftime('%Y-%m-%d %H:%M:%S')} in the fromat 'YYYY-MM-DD HH:MM:SS' (UTC). and the day is {now.strftime('%A')}"
+    
+    # Start with the current time info
+    response_parts = [
+        f"The current iso time is {now.isoformat()}",
+        f"the unix timestamp is {int(now.timestamp())}",
+        f"the normal one is {now.strftime('%Y-%m-%d %H:%M:%S')} in the format 'YYYY-MM-DD HH:MM:SS' (UTC)",
+        f"and the day is {now.strftime('%A')}."
+    ]
+
+    # Add info for the next 7 days
+    for i in range(1, 8):
+        future_date = now + timedelta(days=i)
+        day_name = future_date.strftime('%A')
+        date_str = future_date.strftime('%Y-%m-%d')
+        
+        if i == 1:
+            day_prefix = "Tomorrow"
+        else:
+            day_prefix = f"In {i} days"
+            
+        response_parts.append(f"{day_prefix} is {date_str} and it's a {day_name}.")
+
+    return " ".join(response_parts)
 
 # # save_conversation(contact_id="eWVjjelB67z7cbrlKkO5", conversation="This is a test conversation.")
-# print(get_current_utc_datetime())
+print(get_current_utc_datetime())
 
 # print(get_available_time_slots("2025-08-31 10:00:00", "2025-09-06 10:00:00"))
 def get_contact_info(contact_id: str):
