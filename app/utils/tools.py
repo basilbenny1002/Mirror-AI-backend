@@ -8,7 +8,7 @@ from pymongo import MongoClient
 from datetime import datetime
 import http.client
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import requests
 
 
@@ -37,7 +37,11 @@ HEADERS = {
 BOOKED_FIELD_ID = "59g21lZwv0U3YJBXtQcc"#"r9wLa2H8weqkXfIHgmLA" 59g21lZwv0U3YJBXtQcc       # e.g. "Booked Call" field
 TIME_FIELD_ID = "B4x2SRqU3csMnTw6q8mo"#"Ogr5kUZzwCTtMXQxMf17"   B4x2SRqU3csMnTw6q8mo       # e.g. "Call Time" field
 DATE_FIELD_ID = "4V5u1RjpZ5Lna5QNLeZr"#"SMDVlM8yUR534vvOPkjn"    "4V5u1RjpZ5Lna5QNLeZr"      # e.g. "Call Date" field
-
+ROLE_FIELD_ID = "DUHytN2BwNIfmriWngqJ"  # e.g. "Role" field
+CAUSE_FIELD_ID = "J1bOi2Ab8Uft3Ikrbfqg"  # e.g. "Cause" field
+ADDRESS_FIELD_ID = "iuisj6SiXN5nGWWXwqHJ"  # e.g. "Address" field
+PROPERTY_TYPE_FIELD_ID = "Zga17He1MM0vIc9WgVcx"  # e.g. "Property" field
+PROPERTY_DETAILS_FIELD_ID = "X0BJ4sYFkBZmD4z3L0lm"  # e.g. "Property Details" field
 
 def to_unix(date_str: str) -> int:
     if not date_str:
@@ -79,12 +83,12 @@ def get_weather(city: str):
 
 
 
-def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: str):
+def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: str, role: str, cause: str, address: str, property_type: str, property_details: str):
     """
     Add or update a contact in GoHighLevel with custom fields.
     If the contact with the same email or phone exists, overwrite its info.
     """
-    print(f"Adding/updating contact: {name}, {email}, {phone}, {booked}, {t}, {date}", flush=True)
+    print(f"Adding/updating contact: {name}, {email}, {phone}, {booked}, {t}, {date}, {role}, {cause}, {address}, {property_type}, {property_details}", flush=True)
     if not(str(date).lower() == "cancelled" or str(t).lower() == "cancelled"):
         try:
             dt_str = f"{date} {t}"
@@ -119,7 +123,7 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
                     "message": f"Sorry, the slot {date} {t} has already been taken.",
                     "data": {
                         "contact": {
-                            "customField": [{}, {}, {}] # This safely fills the list
+                            "customField": [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}] # This safely fills the list
                         }
                     }
                 }
@@ -144,7 +148,7 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
                     "message": f"Sorry an exception occurred: {str(e)}",
                     "data": {
                         "contact": {
-                            "customField": [{}, {}, {}] # This safely fills the list
+                            "customField": [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}] # This safely fills the list
                         }
                     }
                 }
@@ -180,7 +184,13 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
         "customField": {
             BOOKED_FIELD_ID: booked,
             TIME_FIELD_ID: new_time,
-            DATE_FIELD_ID: new_date
+            DATE_FIELD_ID: new_date,
+            ROLE_FIELD_ID: role,  # Default to "Buyer"
+            CAUSE_FIELD_ID: cause,  # Default to "N/A"
+            ADDRESS_FIELD_ID: address,  # Default to "N/A"
+            PROPERTY_TYPE_FIELD_ID: property_type,  # Default to "N/A"
+            PROPERTY_DETAILS_FIELD_ID: property_details,  # Default to "N/A"
+
         }
     }
 
@@ -290,18 +300,40 @@ def get_available_time_slots(start_date: str, end_date: str) -> dict:
         return {"status": "error", "code": res.status, "message": str(data.decode("utf-8"))}
     
 
-def get_current_utc_datetime() -> dict:
+def get_current_utc_datetime() -> str:
     """
-    Get the current date and time in UTC.
+    Get the current date and time in UTC and for the next 7 days.
 
     Returns:
-        dict: Contains the current UTC datetime in both ISO 8601 format and Unix timestamp.
+        str: Contains the current UTC datetime and the date and day for the next 7 days.
     """
     now = datetime.now(timezone.utc)
-    return f"The current iso time is {now.isoformat()} and the unix timestamp is {int(now.timestamp())} and the normal one is {now.strftime('%Y-%m-%d %H:%M:%S')} in the fromat 'YYYY-MM-DD HH:MM:SS' (UTC). and the day is {now.strftime('%A')}"
+    
+    # Start with the current time info
+    response_parts = [
+        f"The current iso time is {now.isoformat()}",
+        f"the unix timestamp is {int(now.timestamp())}",
+        f"the normal one is {now.strftime('%Y-%m-%d %H:%M:%S')} in the format 'YYYY-MM-DD HH:MM:SS' (UTC)",
+        f"and the day is {now.strftime('%A')}."
+    ]
+
+    # Add info for the next 7 days
+    for i in range(1, 8):
+        future_date = now + timedelta(days=i)
+        day_name = future_date.strftime('%A')
+        date_str = future_date.strftime('%Y-%m-%d')
+        
+        if i == 1:
+            day_prefix = "Tomorrow"
+        else:
+            day_prefix = f"In {i} days"
+            
+        response_parts.append(f"{day_prefix} is {date_str} and it's a {day_name}.")
+
+    return " ".join(response_parts)
 
 # # save_conversation(contact_id="eWVjjelB67z7cbrlKkO5", conversation="This is a test conversation.")
-# print(get_current_utc_datetime())
+print(get_current_utc_datetime())
 
 # print(get_available_time_slots("2025-08-31 10:00:00", "2025-09-06 10:00:00"))
 def get_contact_info(contact_id: str):
@@ -334,4 +366,4 @@ def replace_dynamic_variables(template, data):
 
     return template
 
-print(get_conversation("eWVjjelB67z7cbrlKkO5"))
+# print(get_conversation("eWVjjelB67z7cbrlKkO5"))

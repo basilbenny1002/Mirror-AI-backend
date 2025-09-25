@@ -416,8 +416,20 @@
 # else:
 #     print("No CSV file found in the dataset folder.")
 
-from app.utils.tools import add_contact, get_available_time_slots
+# from app.utils.tools import add_contact, get_available_time_slots
 # # add_contact(name="potatoooooooooo", email="meowwwwww@example.com", phone="+1222222", booked="Yes", date="04-SEP-2025", t="03:30 PM")
 
 # get_available_time_slots("2025-09-10 00:00:00", "2025-09-10 11:59:00")
 
+# from app.main import ResumeChat
+# import os
+# from dotenv import load_dotenv  
+# from app.utils.tools import replace_dynamic_variables
+# chat = ResumeChat(
+#     id="12345",
+#     followup_stage="10",
+#     notes="the meeting went well hehehehhe",
+# )
+# instructions = os.getenv(f"FOLLOWUP_STAGE_10")
+# i = replace_dynamic_variables(instructions, chat)
+# print("Replaced instructions:", i, flush=True)

@@ -113,9 +113,29 @@ add_contact_tool = {
                 "time": {
                     "type": "string",
                     "description": "Time of the booking in format HH:MM AM/PM, e.g. '08:30 AM'."
+                }, 
+                "role": {
+                    "type": "string",
+                    "description": "Role of the contact in terms of decision maker."
+                },
+                "cause": {
+                    "type": "string",
+                    "description": "Cause of the reason for installation of the charger"
+                },
+                "address": {
+                    "type": "string",
+                    "description": "Address of the property where the charger is being installed."
+                },
+                "property_type": {
+                    "type": "string",
+                    "description": "Type of the property where the charger is being installed."
+                },
+                "property_details": {
+                    "type": "string",
+                    "description": "Details about the property where the charger is being installed"
                 }
             },
-            "required": ["name", "email", "phone", "booked", "date", "time"]
+            "required": ["name", "email", "phone", "booked", "date", "time", "role", "cause", "address", "property_type", "property_details"]
         }
     }
 }
@@ -369,7 +389,12 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                     phone=args["phone"],
                     booked=args["booked"],
                     date=args["date"],
-                    t=args["time"]
+                    t=args["time"],
+                    role=args.get("role", "N/A"),
+                    cause=args.get("cause", "N/A"),
+                    address=args.get("address", "N/A"),
+                    property_type=args.get("property_type", "N/A"),
+                    property_details=args.get("property_details", "N/A"),
                 )
                 print("Add contact result:", result, flush=True)
                 tool_messages.append({
@@ -533,6 +558,11 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                 messages.append({"role": "system", "content": instructions})
                 # If no user_input, send the followup instructions to the LLM
                 if not user_input:
+                    if user.notes != None and followup_stage == "10":
+                        messages.append({
+                            "role": "user",
+                            "content": "<admin>Generate the SMS follow-up message as per the instructions.</admin>"
+                        })
                     try:
                         response = client.chat.completions.create(
                             model=model,
@@ -544,6 +574,8 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                         messages.append({"role": "assistant", "content": response_message})
                         updated_conversation = convert_messages_to_string(messages)
                         save_conversation(conversation=updated_conversation, contact_id=contact_id)
+                        print("TThis part is being executed line 572", flush=True)
+                        print(response_message, flush=True)
                         return JSONResponse(status_code=200, content={"message": response_message})
                     except Exception as e:
                         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -607,7 +639,12 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                         phone=args["phone"],
                         booked=args["booked"],
                         date=args["date"],
-                        t=args["time"]
+                        t=args["time"],
+                        role=args.get("role", "N/A"),
+                        cause=args.get("cause", "N/A"),
+                        address=args.get("address", "N/A"),
+                        property_type=args.get("property_type", "N/A"),
+                        property_details=args.get("property_details", "N/A"),
                     )
                     tool_messages.append({
                         "role": "tool",
