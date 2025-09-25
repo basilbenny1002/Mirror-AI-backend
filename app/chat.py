@@ -558,6 +558,11 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                 messages.append({"role": "system", "content": instructions})
                 # If no user_input, send the followup instructions to the LLM
                 if not user_input:
+                    if user.notes != None and followup_stage == "10":
+                        messages.append({
+                            "role": "user",
+                            "content": "<admin>Generate the SMS follow-up message as per the instructions.</admin>"
+                        })
                     try:
                         response = client.chat.completions.create(
                             model=model,
@@ -569,6 +574,8 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                         messages.append({"role": "assistant", "content": response_message})
                         updated_conversation = convert_messages_to_string(messages)
                         save_conversation(conversation=updated_conversation, contact_id=contact_id)
+                        print("TThis part is being executed line 572", flush=True)
+                        print(response_message, flush=True)
                         return JSONResponse(status_code=200, content={"message": response_message})
                     except Exception as e:
                         return JSONResponse(status_code=500, content={"error": str(e)})
