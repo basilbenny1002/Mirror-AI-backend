@@ -456,11 +456,40 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     else:
         response_message = choice.message.content
 
-    # Append final assistant response to session history
-    sessions[session_id]["messages"].append({
-        "role": "assistant",
-        "content": response_message
-    })
+    # If the model returned an empty/blank response, trigger a fallback completion
+    if not response_message or not str(response_message).strip():
+        # Append the empty assistant reply (for traceability)
+        sessions[session_id]["messages"].append({
+            "role": "assistant",
+            "content": response_message or ""
+        })
+        # Add an admin/user instruction to regenerate
+        sessions[session_id]["messages"].append({
+            "role": "user",
+            "content": "<admin>The previous response was empty, generate a response that sounds like the continuation of the previous message.</admin>"
+        })
+        try:
+            fallback_response = client.chat.completions.create(
+                model=model,
+                messages=sessions[session_id]["messages"],
+                tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
+                tool_choice="auto"
+            )
+            response_message = fallback_response.choices[0].message.content
+        except Exception as e:
+            response_message = f"<admin>Fallback attempt failed: {str(e)}</admin>"
+
+        # Append the regenerated assistant response
+        sessions[session_id]["messages"].append({
+            "role": "assistant",
+            "content": response_message
+        })
+    else:
+        # Append final assistant response to session history (normal path)
+        sessions[session_id]["messages"].append({
+            "role": "assistant",
+            "content": response_message
+        })
 
     # Update last activity timestamp after successful response
     sessions[session_id]["last_activity"] = time.time()
@@ -695,11 +724,36 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
         else:
             response_message = choice.message.content
 
-        # Append final assistant response to session history
-        messages.append({
-            "role": "assistant",
-            "content": response_message
-        })
+        # Fallback if response is empty
+        if not response_message or not str(response_message).strip():
+            messages.append({
+                "role": "assistant",
+                "content": response_message or ""
+            })
+            messages.append({
+                "role": "user",
+                "content": "<admin>The previous response was empty, generate a response that sounds like the continuation of the previous message.</admin>"
+            })
+            try:
+                fallback_response = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
+                    tool_choice="auto"
+                )
+                response_message = fallback_response.choices[0].message.content
+            except Exception as e:
+                response_message = f"<admin>Fallback attempt failed: {str(e)}</admin>"
+            messages.append({
+                "role": "assistant",
+                "content": response_message
+            })
+        else:
+            # Append final assistant response to session history (normal path)
+            messages.append({
+                "role": "assistant",
+                "content": response_message
+            })
 
         # Convert updated conversation to string
         updated_conversation = convert_messages_to_string(messages)
