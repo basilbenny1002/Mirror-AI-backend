@@ -186,6 +186,7 @@ get_available_time_slots_tool = {
 
 # Storage for sessions (session_id to conversation history)
 sessions = {}
+MAX_EMPTY_RETRIES = 3  # safety cap to avoid infinite loops
 
 def convert_messages_to_string(messages):
     """Convert session messages to a formatted string, preserving tool metadata."""
@@ -456,17 +457,21 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
     else:
         response_message = choice.message.content
 
-    # If the model returned an empty/blank response, trigger a fallback completion
-    if not response_message or not str(response_message).strip():
-        # Append the empty assistant reply (for traceability)
+    # Retry loop to avoid returning empty responses
+    attempts = 0
+    while not response_message or not str(response_message).strip():
+        if attempts >= MAX_EMPTY_RETRIES:
+            response_message = "I’m here and ready to continue. Could you clarify what you’d like next?"
+            break
+        # Trace the empty response
         sessions[session_id]["messages"].append({
             "role": "assistant",
             "content": response_message or ""
         })
-        # Add an admin/user instruction to regenerate
+        # Add regeneration instruction
         sessions[session_id]["messages"].append({
             "role": "user",
-            "content": "<admin>The previous response was empty, generate a response that sounds like the continuation of the previous message.</admin>"
+            "content": "<admin>The previous response was empty, generate a response that continues the prior context naturally.</admin>"
         })
         try:
             fallback_response = client.chat.completions.create(
@@ -475,21 +480,79 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                 tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                 tool_choice="auto"
             )
-            response_message = fallback_response.choices[0].message.content
+            fallback_choice = fallback_response.choices[0]
+            if fallback_choice.finish_reason == "tool_calls":
+                tool_calls_fb = fallback_choice.message.tool_calls
+                sessions[session_id]["messages"].append({
+                    "role": "assistant",
+                    "content": fallback_choice.message.content or "",
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": tc.type,
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments
+                            }
+                        } for tc in tool_calls_fb
+                    ]
+                })
+                tool_msgs_fb = []
+                for tc in tool_calls_fb:
+                    try:
+                        if tc.type == "function" and tc.function.name == "get_weather":
+                            args_fb = json.loads(tc.function.arguments)
+                            tool_msgs_fb.append({"role": "tool", "content": get_weather(args_fb["city"]), "tool_call_id": tc.id})
+                        elif tc.type == "function" and tc.function.name == "add_contact":
+                            args_fb = json.loads(tc.function.arguments)
+                            result_fb = add_contact(
+                                name=args_fb["name"],
+                                email=args_fb["email"],
+                                phone=args_fb["phone"],
+                                booked=args_fb["booked"],
+                                date=args_fb["date"],
+                                t=args_fb["time"],
+                                role=args_fb.get("role", "N/A"),
+                                cause=args_fb.get("cause", "N/A"),
+                                address=args_fb.get("address", "N/A"),
+                                property_type=args_fb.get("property_type", "N/A"),
+                                property_details=args_fb.get("property_details", "N/A"),
+                            )
+                            tool_msgs_fb.append({"role": "tool", "content": json.dumps(result_fb), "tool_call_id": tc.id})
+                        elif tc.type == "function" and tc.function.name == "get_available_time_slots":
+                            args_fb = json.loads(tc.function.arguments)
+                            result_fb = get_available_time_slots(args_fb["start_date"], args_fb["end_date"])
+                            tool_msgs_fb.append({"role": "tool", "content": json.dumps(result_fb), "tool_call_id": tc.id})
+                        elif tc.type == "function" and tc.function.name == "get_current_utc_datetime":
+                            json.loads(tc.function.arguments)
+                            now_fb = get_current_utc_datetime()
+                            tool_msgs_fb.append({"role": "tool", "content": json.dumps(now_fb), "tool_call_id": tc.id})
+                    except Exception as e:
+                        tool_msgs_fb.append({"role": "tool", "content": json.dumps({"error": str(e)}), "tool_call_id": tc.id})
+                sessions[session_id]["messages"].extend(tool_msgs_fb)
+                # Finalize after tools
+                try:
+                    final_fb = client.chat.completions.create(
+                        model=model,
+                        messages=sessions[session_id]["messages"],
+                        tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
+                        tool_choice="auto"
+                    )
+                    response_message = final_fb.choices[0].message.content
+                except Exception as e2:
+                    response_message = f"<admin>Fallback tool phase failed: {str(e2)}</admin>"
+            else:
+                response_message = fallback_choice.message.content
         except Exception as e:
             response_message = f"<admin>Fallback attempt failed: {str(e)}</admin>"
+            break
+        attempts += 1
 
-        # Append the regenerated assistant response
-        sessions[session_id]["messages"].append({
-            "role": "assistant",
-            "content": response_message
-        })
-    else:
-        # Append final assistant response to session history (normal path)
-        sessions[session_id]["messages"].append({
-            "role": "assistant",
-            "content": response_message
-        })
+    # Append final assistant response (non-empty or final fallback)
+    sessions[session_id]["messages"].append({
+        "role": "assistant",
+        "content": response_message
+    })
 
     # Update last activity timestamp after successful response
     sessions[session_id]["last_activity"] = time.time()
@@ -724,36 +787,95 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
         else:
             response_message = choice.message.content
 
-        # Fallback if response is empty
-        if not response_message or not str(response_message).strip():
-            messages.append({
-                "role": "assistant",
-                "content": response_message or ""
-            })
+        # Retry loop to avoid empty responses
+        attempts = 0
+        while not response_message or not str(response_message).strip():
+            if attempts >= MAX_EMPTY_RETRIES:
+                response_message = "Just checking back in—let me know how you'd like to proceed."
+                break
+            messages.append({"role": "assistant", "content": response_message or ""})
             messages.append({
                 "role": "user",
-                "content": "<admin>The previous response was empty, generate a response that sounds like the continuation of the previous message.</admin>"
+                "content": "<admin>The previous response was empty, generate a response that continues the context naturally.</admin>"
             })
             try:
-                fallback_response = client.chat.completions.create(
+                fb_resp = client.chat.completions.create(
                     model=model,
                     messages=messages,
                     tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
                     tool_choice="auto"
                 )
-                response_message = fallback_response.choices[0].message.content
+                fb_choice = fb_resp.choices[0]
+                if fb_choice.finish_reason == "tool_calls":
+                    fb_tool_calls = fb_choice.message.tool_calls
+                    messages.append({
+                        "role": "assistant",
+                        "content": fb_choice.message.content or "",
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": tc.type,
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                }
+                            } for tc in fb_tool_calls
+                        ]
+                    })
+                    fb_tool_msgs = []
+                    for tc in fb_tool_calls:
+                        try:
+                            if tc.type == "function" and tc.function.name == "get_weather":
+                                args_fb = json.loads(tc.function.arguments)
+                                fb_tool_msgs.append({"role": "tool", "content": get_weather(args_fb["city"]), "tool_call_id": tc.id})
+                            elif tc.type == "function" and tc.function.name == "add_contact":
+                                args_fb = json.loads(tc.function.arguments)
+                                result_fb = add_contact(
+                                    name=args_fb["name"],
+                                    email=args_fb["email"],
+                                    phone=args_fb["phone"],
+                                    booked=args_fb["booked"],
+                                    date=args_fb["date"],
+                                    t=args_fb["time"],
+                                    role=args_fb.get("role", "N/A"),
+                                    cause=args_fb.get("cause", "N/A"),
+                                    address=args_fb.get("address", "N/A"),
+                                    property_type=args_fb.get("property_type", "N/A"),
+                                    property_details=args_fb.get("property_details", "N/A"),
+                                )
+                                fb_tool_msgs.append({"role": "tool", "content": json.dumps(result_fb), "tool_call_id": tc.id})
+                            elif tc.type == "function" and tc.function.name == "get_available_time_slots":
+                                args_fb = json.loads(tc.function.arguments)
+                                result_fb = get_available_time_slots(args_fb["start_date"], args_fb["end_date"])
+                                fb_tool_msgs.append({"role": "tool", "content": json.dumps(result_fb), "tool_call_id": tc.id})
+                            elif tc.type == "function" and tc.function.name == "get_current_utc_datetime":
+                                json.loads(tc.function.arguments)
+                                now_fb = get_current_utc_datetime()
+                                fb_tool_msgs.append({"role": "tool", "content": json.dumps(now_fb), "tool_call_id": tc.id})
+                        except Exception as e:
+                            fb_tool_msgs.append({"role": "tool", "content": json.dumps({"error": str(e)}), "tool_call_id": tc.id})
+                    messages.extend(fb_tool_msgs)
+                    try:
+                        fb_final = client.chat.completions.create(
+                            model=model,
+                            messages=messages,
+                            tools=[weather_tool, add_contact_tool, get_available_time_slots_tool],
+                            tool_choice="auto"
+                        )
+                        response_message = fb_final.choices[0].message.content
+                    except Exception as e2:
+                        response_message = f"<admin>Fallback tool phase failed: {str(e2)}</admin>"
+                else:
+                    response_message = fb_choice.message.content
             except Exception as e:
                 response_message = f"<admin>Fallback attempt failed: {str(e)}</admin>"
-            messages.append({
-                "role": "assistant",
-                "content": response_message
-            })
-        else:
-            # Append final assistant response to session history (normal path)
-            messages.append({
-                "role": "assistant",
-                "content": response_message
-            })
+                break
+            attempts += 1
+
+        messages.append({
+            "role": "assistant",
+            "content": response_message
+        })
 
         # Convert updated conversation to string
         updated_conversation = convert_messages_to_string(messages)
