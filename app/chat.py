@@ -19,7 +19,7 @@ if not api_key:
 # Initialize OpenAI client
 client = OpenAI(base_url="https://openrouter.ai/api/v1",api_key=api_key)
 # model = os.getenv("MODEL_NAME")
-model="anthropic/claude-sonnet-4"
+model="anthropic/claude-sonnet-4.5"
 # Extract text from the PDF file
 pdf_path = "Wallace Energy combined pdf.pdf"
 if not os.path.exists(pdf_path):
