@@ -433,3 +433,27 @@
 # instructions = os.getenv(f"FOLLOWUP_STAGE_10")
 # i = replace_dynamic_variables(instructions, chat)
 # print("Replaced instructions:", i, flush=True)
+# import os
+# import PyPDF2
+# import sys
+# sys.stdout.reconfigure(encoding='utf-8')
+
+# model="anthropic/claude-sonnet-4.5"
+# # Extract text from the PDF file
+# pdf_path = "salesmind_info.pdf"
+# if not os.path.exists(pdf_path):
+#     raise FileNotFoundError(f"PDF file not found at {pdf_path}")
+
+# try:
+#     with open(pdf_path, "rb") as file:
+#         pdf_reader = PyPDF2.PdfReader(file)
+#         pdf_text = ""
+#         for page in pdf_reader.pages:
+#             extracted_text = page.extract_text()
+#             if extracted_text:
+#                 pdf_text += extracted_text + "\n"
+#         if not pdf_text:
+#             raise ValueError("No text could be extracted from the PDF.")
+#         print(pdf_text)
+# except Exception as e:
+#     raise Exception(f"Failed to process PDF: {str(e)}")

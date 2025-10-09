@@ -290,7 +290,7 @@ def get_available_time_slots(start_date: str, end_date: str) -> dict:
     'Version': '2021-04-15',
     'Authorization': 'Bearer ' + GHL_TOKEN
     }
-    conn.request("GET", f"/calendars/JzIjRCGcT0ub3anLQjai/free-slots?startDate={s}&endDate={e}&timezone=UTC", payload, headers)
+    conn.request("GET", f"/calendars/XlDrGEigeuLKCO44VK7d/free-slots?startDate={s}&endDate={e}&timezone=UTC", payload, headers)
     res = conn.getresponse()
     data = res.read()
     print(data.decode("utf-8"), flush=True)
