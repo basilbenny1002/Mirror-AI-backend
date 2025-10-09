@@ -21,6 +21,7 @@ class ChatRequest(BaseModel):
 
 class ResumeChat(BaseModel):
     id: str
+    source: str
     reply: Optional[str] = None
     followup_stage: str
     name: Optional[str] = None
@@ -34,6 +35,7 @@ class ResumeChat(BaseModel):
 class ChatMessage(BaseModel):
     id: str
     content: str
+    source: str
 
 
 @app.get("/")
@@ -51,13 +53,13 @@ def chat(data: ChatRequest):
 @app.post("/resume_chat")
 def resume_chat(data: ResumeChat):
     try:
-        return resume_chat_session(contact_id=data.id, user_input=data.reply, followup_stage=data.followup_stage, user=data)
+        return resume_chat_session(contact_id=data.id, user_input=data.reply, followup_stage=data.followup_stage, user=data, source=data.source)
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
     
 @app.post("/add_ai_message")
 def add_ai_message_endpoint(data: ChatMessage):
     try:
-        return add_ai_message(contact_id=data.id, ai_message=data.content)
+        return add_ai_message(contact_id=data.id, ai_message=data.content, source=data.source)
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})

@@ -114,29 +114,9 @@ add_contact_tool = {
                 "time": {
                     "type": "string",
                     "description": "Time of the booking in format HH:MM AM/PM, e.g. '08:30 AM'."
-                }, 
-                "role": {
-                    "type": "string",
-                    "description": "Role of the contact in terms of decision maker."
-                },
-                "cause": {
-                    "type": "string",
-                    "description": "Cause of the reason for installation of the charger"
-                },
-                "address": {
-                    "type": "string",
-                    "description": "Address of the property where the charger is being installed."
-                },
-                "property_type": {
-                    "type": "string",
-                    "description": "Type of the property where the charger is being installed."
-                },
-                "property_details": {
-                    "type": "string",
-                    "description": "Details about the property where the charger is being installed"
                 }
             },
-            "required": ["name", "email", "phone", "booked", "date", "time", "role", "cause", "address", "property_type", "property_details"]
+            "required": ["name", "email", "phone", "booked", "date", "time"]
         }
     }
 }
@@ -390,13 +370,8 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                     email=args["email"],
                     phone=args["phone"],
                     booked=args["booked"],
-                    date=args["date"],
                     t=args["time"],
-                    role=args.get("role", "N/A"),
-                    cause=args.get("cause", "N/A"),
-                    address=args.get("address", "N/A"),
-                    property_type=args.get("property_type", "N/A"),
-                    property_details=args.get("property_details", "N/A"),
+                    date=args["date"],
                 )
                 print("Add contact result:", result, flush=True)
                 tool_messages.append({
@@ -511,13 +486,8 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
                                 email=args_fb["email"],
                                 phone=args_fb["phone"],
                                 booked=args_fb["booked"],
-                                date=args_fb["date"],
                                 t=args_fb["time"],
-                                role=args_fb.get("role", "N/A"),
-                                cause=args_fb.get("cause", "N/A"),
-                                address=args_fb.get("address", "N/A"),
-                                property_type=args_fb.get("property_type", "N/A"),
-                                property_details=args_fb.get("property_details", "N/A"),
+                                date=args_fb["date"],
                             )
                             tool_msgs_fb.append({"role": "tool", "content": json.dumps(result_fb), "tool_call_id": tc.id})
                         elif tc.type == "function" and tc.function.name == "get_available_time_slots":
@@ -590,7 +560,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         content["contact_id"] = extracted_contact_id
     return JSONResponse(status_code=200, content=content)
 
-def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: str = ""):
+def resume_chat_session(contact_id: str, user_input: str, source, user, followup_stage: str = ""):
     """Resume or start a chat session from a conversation string, continue with new user input, and return updated conversation string.
    
     Args:
@@ -600,6 +570,7 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
         followup_stage: Optional stage for followup instructions
     """
     welcome_message = final_instructions
+    user_input = user_input + f"<admin>This conversation is taking place on {source}"
     if followup_stage:
         welcome_message = final_instructions
         messages = []
@@ -731,13 +702,8 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                         email=args["email"],
                         phone=args["phone"],
                         booked=args["booked"],
-                        date=args["date"],
                         t=args["time"],
-                        role=args.get("role", "N/A"),
-                        cause=args.get("cause", "N/A"),
-                        address=args.get("address", "N/A"),
-                        property_type=args.get("property_type", "N/A"),
-                        property_details=args.get("property_details", "N/A"),
+                        date=args["date"],
                     )
                     tool_messages.append({
                         "role": "tool",
@@ -836,13 +802,8 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
                                     email=args_fb["email"],
                                     phone=args_fb["phone"],
                                     booked=args_fb["booked"],
-                                    date=args_fb["date"],
                                     t=args_fb["time"],
-                                    role=args_fb.get("role", "N/A"),
-                                    cause=args_fb.get("cause", "N/A"),
-                                    address=args_fb.get("address", "N/A"),
-                                    property_type=args_fb.get("property_type", "N/A"),
-                                    property_details=args_fb.get("property_details", "N/A"),
+                                    date=args_fb["date"],
                                 )
                                 fb_tool_msgs.append({"role": "tool", "content": json.dumps(result_fb), "tool_call_id": tc.id})
                             elif tc.type == "function" and tc.function.name == "get_available_time_slots":
@@ -883,7 +844,7 @@ def resume_chat_session(contact_id: str, user_input: str, user, followup_stage: 
         save_conversation(conversation=updated_conversation, contact_id=contact_id)
         return JSONResponse(status_code=200, content={"message": response_message})
 
-def add_ai_message(contact_id: str, ai_message: str):
+def add_ai_message(contact_id: str, ai_message: str, source: str):
     """Add an AI-generated message to the conversation history for a given contact ID.
 
     Args:
@@ -929,7 +890,7 @@ def add_ai_message(contact_id: str, ai_message: str):
     # Append the new AI message
     messages.append({
         "role": "assistant",
-        "content": ai_message + "<admin>This message was sent to the user via SMS</admin>"
+        "content": ai_message + f"<admin>This message was sent to the user via {source}</admin>"
     })
     
     # Convert updated conversation to string
