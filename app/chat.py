@@ -105,7 +105,7 @@ add_contact_tool = {
                 },
                 "booked": {
                     "type": "string",
-                    "description": "Booking status of the contact. Must be either 'yes' or 'no'."
+                    "description": "Booking status of the contact. Must be either 'yes' or 'no' or 'reschedule' if the event was a reschedule."
                 },
                 "date": {
                     "type": "string",
