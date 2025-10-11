@@ -197,6 +197,7 @@ def chat_session(session_id: str, user_input: str, end: bool = False):
         user_input: User text prompt
         end: If True, close the chat, call save_conversation with details, and clear session
     """
+    user_input = user_input + "<admin>This conversation is taking place on the website</admin>"
     # Check for inactive sessions (older than 1 hour)
     instructions = final_instructions.replace("_CURRENT_TIME_", get_current_utc_datetime())
     current_time = time.time()
@@ -570,7 +571,7 @@ def resume_chat_session(contact_id: str, user_input: str, source, user, followup
         followup_stage: Optional stage for followup instructions
     """
     welcome_message = final_instructions
-    user_input = user_input + f"<admin>This conversation is taking place on {source}"
+    user_input = user_input + f"<admin>This conversation is taking place on {source} </admin>"
     if followup_stage:
         welcome_message = final_instructions
         messages = []
