@@ -128,7 +128,7 @@ def add_contact(name: str, email: str, phone: str, booked: str, t: str, date: st
             # Convert to PDT
             print("\nDate and time before timezone conversion:\n", flush=True)
             print(date, " ", t, "\n", flush=True)
-            dt_pdt = dt_utc.astimezone(ZoneInfo("America/New_York"))
+            dt_pdt = dt_utc.astimezone(ZoneInfo("America/Los_Angeles"))
             
             # Format back
             new_date = dt_pdt.strftime("%d-%b-%Y").upper()   # e.g. "21-OCT-2021"
